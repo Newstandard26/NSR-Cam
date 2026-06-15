@@ -20,9 +20,12 @@ import {
   ChevronRight,
   Zap,
   BarChart2,
+  LogOut,
+  LogIn,
 } from "lucide-react"
 import { useState } from "react"
-import { cn } from "@/lib/utils"
+import { useSession, signOut } from "next-auth/react"
+import { cn, getUserInitials } from "@/lib/utils"
 
 const nav = [
   {
@@ -64,6 +67,7 @@ const nav = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const { data: session } = useSession()
   const [open, setOpen] = useState<string[]>(["Projects", "Marketing", "Resources"])
 
   function toggle(label: string) {
@@ -139,14 +143,55 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="px-4 py-3 border-t border-gray-700">
+      <div className="border-t border-gray-700 px-2 py-2 space-y-0.5">
         <Link
           href="/settings"
-          className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors"
+          className={cn(
+            "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
+            pathname.startsWith("/settings")
+              ? "bg-blue-600 text-white"
+              : "text-gray-400 hover:bg-gray-800 hover:text-white"
+          )}
         >
           <Settings className="w-4 h-4" />
           Settings
         </Link>
+
+        {session?.user ? (
+          <div className="flex items-center gap-2 px-2 py-2">
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white shrink-0"
+              style={{ backgroundColor: session.user.color || "#3B82F6" }}
+            >
+              {getUserInitials(session.user.name || session.user.email || "?")}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-white truncate">
+                {session.user.name || session.user.email}
+              </p>
+              {session.user.role && (
+                <p className="text-[10px] text-gray-400 capitalize">
+                  {session.user.role.toLowerCase()}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              title="Sign out"
+              className="text-gray-400 hover:text-white"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <Link
+            href="/login"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            <LogIn className="w-4 h-4" />
+            Sign in
+          </Link>
+        )}
       </div>
     </aside>
   )
