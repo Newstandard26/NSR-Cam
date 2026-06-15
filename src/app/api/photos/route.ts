@@ -47,22 +47,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "photo and project_id are required" }, { status: 400 })
   }
 
-  const key = `photos/${projectId}/${randomUUID()}-${file.name || "capture.jpg"}`
-  const buffer = Buffer.from(await file.arrayBuffer())
-  const { uri } = await uploadFile("nsr-cam", key, buffer, file.type || "image/jpeg")
+  try {
+    const key = `photos/${projectId}/${randomUUID()}-${file.name || "capture.jpg"}`
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const { uri } = await uploadFile("nsr-cam", key, buffer, file.type || "image/jpeg")
 
-  const photo = await db.photo.create({
-    data: {
-      projectId,
-      userId: session.user?.id,
-      storageKey: key,
-      uri,
-      description,
-      lat: latRaw ? parseFloat(latRaw) : null,
-      lng: lngRaw ? parseFloat(lngRaw) : null,
-      capturedAt: new Date(),
-    },
-  })
+    const photo = await db.photo.create({
+      data: {
+        projectId,
+        userId: session.user?.id,
+        storageKey: key,
+        uri,
+        description,
+        lat: latRaw ? parseFloat(latRaw) : null,
+        lng: lngRaw ? parseFloat(lngRaw) : null,
+        capturedAt: new Date(),
+      },
+    })
 
-  return NextResponse.json(photo, { status: 201 })
+    return NextResponse.json(photo, { status: 201 })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ error: "Upload failed", detail: message }, { status: 500 })
+  }
 }
