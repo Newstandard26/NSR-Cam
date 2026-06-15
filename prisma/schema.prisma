@@ -69,6 +69,7 @@ model User {
   checklistCompletions   ChecklistItemCompletion[]
   showcases              Showcase[]
   reviewRequests         ReviewRequest[]
+  photoTasks             PhotoTask[]
 }
 
 enum Role {
@@ -198,12 +199,35 @@ model Photo {
   description String?    @db.Text
   lat         Float?
   lng         Float?
+  width       Int?
+  height      Int?
+  fileSize    Int?
+  annotations Json?      // Fabric.js canvas JSON
+  brightness  Float?     @default(0)
+  contrast    Float?     @default(0)
+  saturation  Float?     @default(0)
+  rotation    Int?       @default(0)
   createdAt   DateTime   @default(now())
 
-  project  Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user     User?      @relation(fields: [userId], references: [id])
+  project  Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user     User?       @relation(fields: [userId], references: [id])
   tags     PhotoTag[]
-  comments Comment[]  @relation("PhotoComments")
+  comments Comment[]   @relation("PhotoComments")
+  tasks    PhotoTask[]
+}
+
+model PhotoTask {
+  id          String    @id @default(cuid())
+  photoId     String
+  text        String
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  assigneeId  String?
+  dueDate     DateTime?
+  createdAt   DateTime  @default(now())
+
+  photo    Photo @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  assignee User? @relation(fields: [assigneeId], references: [id])
 }
 
 model PhotoTag {
