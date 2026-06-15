@@ -16,6 +16,7 @@ import {
   Tag,
   Layers,
   Settings,
+  Home,
   ChevronDown,
   ChevronRight,
   Zap,
@@ -29,6 +30,7 @@ import { cn, getUserInitials } from "@/lib/utils"
 import { BrandMark } from "@/components/brand"
 
 const nav = [
+  { label: "Home", href: "/dashboard", icon: Home },
   {
     label: "Projects",
     icon: FolderOpen,

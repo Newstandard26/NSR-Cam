@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import {
-  X, ChevronLeft, ChevronRight, Download, Trash2, Pencil, MapPin, Plus, Tag as TagIcon,
+  X, ChevronLeft, ChevronRight, Download, Trash2, Pencil, MapPin, Plus, Tag as TagIcon, MoreHorizontal,
 } from "lucide-react"
 import { Avatar, LabelBadge } from "@/components/ui/badges"
 import { AnnotationEditor } from "./annotation-editor"
 import { SelectTagsModal } from "./select-tags-modal"
+import { PhotoContextMenu } from "./photo-context-menu"
 
 type Basic = { id: string }
 
@@ -29,6 +30,8 @@ export function PhotoModal({
   const [photo, setPhoto] = useState<FullPhoto | null>(null)
   const [editing, setEditing] = useState(false)
   const [tagsOpen, setTagsOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [savedBanner, setSavedBanner] = useState(false)
   const [descEditing, setDescEditing] = useState(false)
   const [desc, setDesc] = useState("")
   const [comment, setComment] = useState("")
@@ -96,6 +99,7 @@ export function PhotoModal({
           </button>
           <a href={photo.uri} download className="p-2 rounded-lg hover:bg-white/10"><Download className="w-5 h-5" /></a>
           <button onClick={trash} className="p-2 rounded-lg hover:bg-white/10"><Trash2 className="w-5 h-5" /></button>
+          <button onClick={() => setMenuOpen(true)} className="p-2 rounded-lg hover:bg-white/10"><MoreHorizontal className="w-5 h-5" /></button>
           <button onClick={onClose} className="ml-auto p-2 rounded-lg hover:bg-white/10"><X className="w-6 h-6" /></button>
         </div>
 
@@ -195,6 +199,22 @@ export function PhotoModal({
             </div>
           </div>
         </div>
+
+        {/* Mobile bottom action bar (right panel is hidden on mobile) */}
+        <div className="md:hidden flex items-center justify-around bg-white py-2 pb-[env(safe-area-inset-bottom)]">
+          <button onClick={() => setTagsOpen(true)} className="flex flex-col items-center text-[10px] text-gray-600 px-3 py-1"><TagIcon className="w-5 h-5" /> Tags</button>
+          <button onClick={() => setEditing(true)} className="flex flex-col items-center text-[10px] text-gray-600 px-3 py-1"><Pencil className="w-5 h-5" /> Edit</button>
+          {photo.lat && photo.lng && (
+            <a href={`https://www.google.com/maps/place/${photo.lat},${photo.lng}`} target="_blank" rel="noreferrer" className="flex flex-col items-center text-[10px] text-gray-600 px-3 py-1"><MapPin className="w-5 h-5" /> Map</a>
+          )}
+          <button onClick={() => setMenuOpen(true)} className="flex flex-col items-center text-[10px] text-gray-600 px-3 py-1"><MoreHorizontal className="w-5 h-5" /> More</button>
+        </div>
+
+        {savedBanner && (
+          <div className="absolute bottom-0 inset-x-0 bg-green-500 text-white text-center py-4 font-semibold flex items-center justify-center gap-2 z-[90]">
+            ✓ Edits Saved!
+          </div>
+        )}
       </div>
 
       {editing && (
@@ -206,7 +226,20 @@ export function PhotoModal({
           contrast={photo.contrast ?? 0}
           saturation={photo.saturation ?? 0}
           onClose={() => setEditing(false)}
-          onSaved={() => { setEditing(false); load(); onChanged?.() }}
+          onSaved={() => {
+            setEditing(false); load(); onChanged?.()
+            setSavedBanner(true); setTimeout(() => setSavedBanner(false), 3000)
+          }}
+        />
+      )}
+      {menuOpen && (
+        <PhotoContextMenu
+          photoId={photo.id}
+          projectId={photo.project?.id}
+          uri={photo.uri}
+          onClose={() => setMenuOpen(false)}
+          onOpenTags={() => setTagsOpen(true)}
+          onChanged={() => { load(); onChanged?.() }}
         />
       )}
       {tagsOpen && (
