@@ -5,14 +5,20 @@ import { Camera, RefreshCw, Check, Loader2, SwitchCamera, ImageIcon } from "luci
 
 type Project = { id: string; name: string }
 
-export function CameraCapture() {
+export function CameraCapture({
+  lockedProjectId,
+  lockedProjectName,
+}: {
+  lockedProjectId?: string
+  lockedProjectName?: string
+}) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [projects, setProjects] = useState<Project[]>([])
-  const [projectId, setProjectId] = useState("")
+  const [projectId, setProjectId] = useState(lockedProjectId ?? "")
   const [facing, setFacing] = useState<"environment" | "user">("environment")
   const [streaming, setStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -21,19 +27,22 @@ export function CameraCapture() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
 
   useEffect(() => {
-    fetch("/api/projects")
-      .then((r) => r.json())
-      .then((d) => {
-        const list = Array.isArray(d) ? d : []
-        setProjects(list)
-        if (list[0]) setProjectId(list[0].id)
-      })
+    // When locked to a project, no selector is needed.
+    if (!lockedProjectId) {
+      fetch("/api/projects")
+        .then((r) => r.json())
+        .then((d) => {
+          const list = Array.isArray(d) ? d : []
+          setProjects(list)
+          if (list[0]) setProjectId(list[0].id)
+        })
+    }
     navigator.geolocation?.getCurrentPosition(
       (p) => setCoords({ lat: p.coords.latitude, lng: p.coords.longitude }),
       () => {},
       { enableHighAccuracy: true }
     )
-  }, [])
+  }, [lockedProjectId])
 
   const startCamera = useCallback(async () => {
     setError(null)
@@ -99,18 +108,25 @@ export function CameraCapture() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Project selector */}
+      {/* Project context */}
       <div className="p-3 bg-gray-900">
-        <select
-          value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-          className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm"
-        >
-          <option value="">Select a project…</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+        {lockedProjectId ? (
+          <div className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm flex items-center gap-2">
+            <span className="text-gray-400">Saving to:</span>
+            <span className="font-medium truncate">{lockedProjectName ?? "this project"}</span>
+          </div>
+        ) : (
+          <select
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+            className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm"
+          >
+            <option value="">Select a project…</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Viewfinder */}

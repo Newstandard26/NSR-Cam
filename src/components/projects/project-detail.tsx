@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, Camera } from "lucide-react"
 import { Avatar, LabelBadge } from "@/components/ui/badges"
 import { PhotoGrid, type PhotoItem } from "@/components/photos/photo-grid"
 import { PhotoUploader } from "@/components/photos/photo-uploader"
@@ -85,6 +85,12 @@ export function ProjectDetail({ project }: { project: Project }) {
 
         {tab === "Photos" && (
           <div className="space-y-4">
+            <Link
+              href={`/camera?project=${project.id}`}
+              className="flex items-center justify-center gap-2 w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-medium hover:bg-blue-700"
+            >
+              <Camera className="w-5 h-5" /> Take Photo for {project.name}
+            </Link>
             <PhotoUploader projectId={project.id} />
             {loadingPhotos ? (
               <p className="text-sm text-gray-400">Loading photos...</p>
