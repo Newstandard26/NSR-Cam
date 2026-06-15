@@ -54,6 +54,8 @@ model User {
   role          Role      @default(FIELD)
   initials      String?
   color         String?   @default("#3B82F6")
+  passwordHash  String?
+  mustChangePassword Boolean @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

@@ -11,6 +11,7 @@ declare module "next-auth" {
       role?: string
       initials?: string
       color?: string
+      mustChangePassword?: boolean
     }
   }
 }
@@ -21,5 +22,6 @@ declare module "next-auth/jwt" {
     role?: string
     initials?: string
     color?: string
+    mustChangePassword?: boolean
   }
 }

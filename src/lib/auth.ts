@@ -1,6 +1,5 @@
 import { NextAuthOptions } from "next-auth"
 import { PrismaAdapter } from "@auth/prisma-adapter"
-import EmailProvider from "next-auth/providers/email"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { db } from "./db"
 import bcrypt from "bcryptjs"
@@ -23,9 +22,11 @@ export const authOptions: NextAuthOptions = {
         const user = await db.user.findUnique({
           where: { email: credentials.email },
         })
-        if (!user || !user.email) return null
-        // For initial setup: accept any password, then hash and store
-        // Replace with: const valid = await bcrypt.compare(credentials.password, user.passwordHash)
+        if (!user || !user.email || !user.passwordHash) return null
+
+        const valid = await bcrypt.compare(credentials.password, user.passwordHash)
+        if (!valid) return null
+
         return {
           id: user.id,
           email: user.email,
@@ -36,13 +37,17 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id
-        const dbUser = await db.user.findUnique({ where: { id: user.id } })
+      }
+      // Refresh user fields on sign-in and on session update (e.g. after password change)
+      if (user || trigger === "update") {
+        const dbUser = await db.user.findUnique({ where: { id: token.id as string } })
         token.role = dbUser?.role ?? undefined
         token.initials = dbUser?.initials ?? undefined
         token.color = dbUser?.color ?? undefined
+        token.mustChangePassword = dbUser?.mustChangePassword ?? false
       }
       return token
     },
@@ -52,6 +57,7 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as string
         session.user.initials = token.initials as string
         session.user.color = token.color as string
+        session.user.mustChangePassword = token.mustChangePassword as boolean
       }
       return session
     },
