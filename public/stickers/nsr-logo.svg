@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <g fill="none" stroke="#111" stroke-width="9" stroke-linejoin="round">
+    <path d="M40 95 L100 45 L160 95"/>
+    <path d="M20 95 L180 95"/>
+  </g>
+  <text x="100" y="150" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="58" fill="#111">NSR</text>
+  <line x1="118" y1="30" x2="150" y2="170" stroke="#4db8e8" stroke-width="12" stroke-linecap="round"/>
+  <text x="100" y="182" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" letter-spacing="1" fill="#4db8e8">NEW STANDARD RESTORATION</text>
+</svg>

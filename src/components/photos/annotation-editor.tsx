@@ -3,28 +3,30 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import {
   MousePointer2, Pencil, Minus, ArrowUpRight, Circle as CircleIcon, Square as SquareIcon,
-  Type, Clock, Sticker, RotateCw, Sliders, Trash2, Undo2, Redo2, X, Check,
+  Type, Clock, Sticker, RotateCw, Sliders, Trash2, Undo2, Redo2, X, Check, Crop,
 } from "lucide-react"
 
 const COLORS = ["#ffffff", "#000000", "#06b6d4", "#22c55e", "#eab308", "#f97316", "#ec4899", "#ef4444"]
 const THICKNESS = [{ label: "Thin", v: 2 }, { label: "Medium", v: 5 }, { label: "Thick", v: 10 }]
 
-const EMOJI_STICKERS = [
-  { id: "approved", text: "APPROVED", label: true },
-  { id: "finished", text: "FINISHED", label: true },
-  { id: "start", text: "START", label: true },
-  { id: "end", text: "END", label: true },
-  { id: "check", text: "✓", color: "#22c55e" },
-  { id: "x", text: "✗", color: "#ef4444" },
-  { id: "thumbs-up", text: "👍" },
-  { id: "thumbs-down", text: "👎" },
-  { id: "warning", text: "⚠️" },
-  { id: "dot-red", text: "🔴" },
-  { id: "dot-green", text: "🟢" },
-  { id: "dot-yellow", text: "🟡" },
-  { id: "dot-blue", text: "🔵" },
-  { id: "circle-check", text: "✅" },
-  { id: "circle-x", text: "❌" },
+type StickerDef = { id: string; label?: string; kind: "label" | "svg" | "emoji"; text?: string; src?: string }
+const STICKERS: StickerDef[] = [
+  { id: "nsr-logo", kind: "svg", src: "/stickers/nsr-logo.svg", label: "NSR Logo" },
+  { id: "check", kind: "svg", src: "/stickers/check.svg", label: "Check" },
+  { id: "x-mark", kind: "svg", src: "/stickers/x-mark.svg", label: "X" },
+  { id: "thumbs-up", kind: "svg", src: "/stickers/thumbs-up.svg", label: "Thumbs Up" },
+  { id: "thumbs-down", kind: "svg", src: "/stickers/thumbs-down.svg", label: "Thumbs Down" },
+  { id: "warning", kind: "svg", src: "/stickers/warning.svg", label: "Warning" },
+  { id: "approved", kind: "label", text: "APPROVED" },
+  { id: "finished", kind: "label", text: "FINISHED" },
+  { id: "start", kind: "label", text: "START" },
+  { id: "end", kind: "label", text: "END" },
+  { id: "dot-red", kind: "emoji", text: "🔴" },
+  { id: "dot-green", kind: "emoji", text: "🟢" },
+  { id: "dot-yellow", kind: "emoji", text: "🟡" },
+  { id: "dot-blue", kind: "emoji", text: "🔵" },
+  { id: "circle-check", kind: "emoji", text: "✅" },
+  { id: "circle-x", kind: "emoji", text: "❌" },
 ]
 
 type Tool = "select" | "draw" | "line" | "arrow" | "circle" | "square" | "text" | "timestamp"
@@ -71,6 +73,9 @@ export function AnnotationEditor({
   const [saturation, setSaturation] = useState(s0)
   const [saving, setSaving] = useState(false)
   const [ready, setReady] = useState(false)
+  const [cropping, setCropping] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cropRectRef = useRef<any>(null)
 
   toolRef.current = tool
   colorRef.current = color
@@ -199,20 +204,27 @@ export function AnnotationEditor({
     if (el) el.style.filter = filter
   }, [brightness, contrast, saturation, ready])
 
-  function addSticker(s: typeof EMOJI_STICKERS[number]) {
+  async function addSticker(s: StickerDef) {
     const c = canvasRef.current, fabric = fabricRef.current
     if (!c || !fabric) return
     const cx = c.width / 2, cy = c.height / 2
-    if (s.label) {
-      const txt = new fabric.FabricText(s.text, { fontSize: 22, fontWeight: "bold", fill: "#000", originX: "center", originY: "center" })
+    if (s.kind === "label") {
+      const txt = new fabric.FabricText(s.text!, { fontSize: 22, fontWeight: "bold", fill: "#000", originX: "center", originY: "center" })
       const rect = new fabric.Rect({ width: txt.width! + 28, height: txt.height! + 16, rx: 6, fill: "#fff", stroke: "#000", strokeWidth: 2, originX: "center", originY: "center" })
       const group = new fabric.Group([rect, txt], { left: cx, top: cy, originX: "center", originY: "center" })
       c.add(group); c.setActiveObject(group)
+    } else if (s.kind === "svg") {
+      const loaded = await fabric.loadSVGFromURL(s.src!)
+      const objs = (loaded.objects || []).filter(Boolean)
+      const obj = fabric.util.groupSVGElements(objs, loaded.options)
+      obj.set({ left: cx, top: cy, originX: "center", originY: "center" })
+      obj.scaleToWidth(s.id === "nsr-logo" ? 160 : 90)
+      c.add(obj); c.setActiveObject(obj)
     } else {
-      const t = new fabric.FabricText(s.text, { fontSize: 56, fill: s.color || "#000", left: cx, top: cy, originX: "center", originY: "center" })
+      const t = new fabric.FabricText(s.text!, { fontSize: 56, left: cx, top: cy, originX: "center", originY: "center" })
       c.add(t); c.setActiveObject(t)
     }
-    pushHistory(); setShowStickers(false)
+    c.renderAll(); pushHistory(); setShowStickers(false)
   }
 
   function rotate() {
@@ -228,6 +240,41 @@ export function AnnotationEditor({
     if (!confirm("Remove all annotations?")) return
     c.getObjects().forEach((o: unknown) => c.remove(o))
     c.renderAll(); pushHistory()
+  }
+  function startCrop() {
+    const c = canvasRef.current, fabric = fabricRef.current
+    if (!c || !fabric) return
+    setTool("select")
+    const rect = new fabric.Rect({
+      left: c.width * 0.15, top: c.height * 0.15, width: c.width * 0.7, height: c.height * 0.7,
+      fill: "rgba(0,0,0,0.15)", stroke: "#4db8e8", strokeWidth: 2, strokeDashArray: [6, 4],
+      cornerColor: "#4db8e8", transparentCorners: false,
+    })
+    cropRectRef.current = rect
+    c.add(rect); c.setActiveObject(rect); c.renderAll()
+    setCropping(true)
+  }
+  function cancelCrop() {
+    const c = canvasRef.current
+    if (c && cropRectRef.current) { c.remove(cropRectRef.current); c.renderAll() }
+    cropRectRef.current = null
+    setCropping(false)
+  }
+  function applyCrop() {
+    const c = canvasRef.current
+    const rect = cropRectRef.current
+    if (!c || !rect) return
+    const b = rect.getBoundingRect()
+    c.remove(rect)
+    cropRectRef.current = null
+    // Shift every object + background so the crop region's top-left becomes the origin.
+    c.getObjects().forEach((o: any) => { o.set({ left: o.left - b.left, top: o.top - b.top }); o.setCoords() })
+    const bg = c.backgroundImage
+    if (bg) { bg.set({ left: (bg.left || 0) - b.left, top: (bg.top || 0) - b.top }); bg.setCoords() }
+    c.setDimensions({ width: Math.round(b.width), height: Math.round(b.height) })
+    c.renderAll()
+    setCropping(false)
+    pushHistory()
   }
   function undo() {
     const c = canvasRef.current
@@ -290,6 +337,7 @@ export function AnnotationEditor({
         <Btn title="Sticker" onClick={() => { setShowStickers((v) => !v); setShowColors(false); setShowThick(false); setShowAdjust(false) }}><Sticker className="w-5 h-5" /></Btn>
         <div className="h-px w-8 bg-gray-700 my-1" />
         <Btn title="Rotate" onClick={rotate}><RotateCw className="w-5 h-5" /></Btn>
+        <Btn active={cropping} title="Crop" onClick={() => (cropping ? cancelCrop() : startCrop())}><Crop className="w-5 h-5" /></Btn>
         <Btn title="Adjust color" onClick={() => { setShowAdjust((v) => !v); setShowColors(false); setShowThick(false); setShowStickers(false) }}><Sliders className="w-5 h-5" /></Btn>
         <div className="h-px w-8 bg-gray-700 my-1" />
         <Btn title="Clear all" onClick={clearAll}><Trash2 className="w-5 h-5" /></Btn>
@@ -302,6 +350,14 @@ export function AnnotationEditor({
         <canvas ref={canvasElRef} />
         {!ready && <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">Loading editor…</div>}
         <button onClick={onClose} className="absolute top-3 right-3 text-white/80 hover:text-white z-10"><X className="w-7 h-7" /></button>
+
+        {cropping && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-gray-800 rounded-lg px-3 py-2 z-20">
+            <span className="text-white text-xs">Drag the box, then apply</span>
+            <button onClick={applyCrop} className="bg-brand text-white text-sm px-3 py-1 rounded-md hover:bg-brand-dark">Apply Crop</button>
+            <button onClick={cancelCrop} className="text-gray-300 text-sm px-2">Cancel</button>
+          </div>
+        )}
 
         {/* Popovers */}
         {showColors && (
@@ -325,9 +381,14 @@ export function AnnotationEditor({
           <div className="absolute left-2 top-2 bg-gray-800 p-3 rounded-lg w-56 max-h-[70vh] overflow-y-auto z-20">
             <p className="text-white text-sm font-medium mb-2">Add Sticker</p>
             <div className="grid grid-cols-3 gap-2">
-              {EMOJI_STICKERS.map((s) => (
-                <button key={s.id} onClick={() => addSticker(s)} className="bg-gray-700 hover:bg-gray-600 rounded-lg p-2 text-center text-white text-xs h-14 flex items-center justify-center">
-                  <span className={s.label ? "font-bold text-[10px]" : "text-2xl"} style={{ color: s.color }}>{s.text}</span>
+              {STICKERS.map((s) => (
+                <button key={s.id} onClick={() => addSticker(s)} title={s.label || s.id} className="bg-gray-700 hover:bg-gray-600 rounded-lg p-2 text-center text-white text-xs h-14 flex items-center justify-center">
+                  {s.kind === "svg" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={s.src} alt={s.label} className="h-8 w-8 object-contain" />
+                  ) : (
+                    <span className={s.kind === "label" ? "font-bold text-[10px]" : "text-2xl"}>{s.text}</span>
+                  )}
                 </button>
               ))}
             </div>
