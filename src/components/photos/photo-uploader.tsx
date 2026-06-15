@@ -15,10 +15,21 @@ export function PhotoUploader({ projectId }: { projectId: string }) {
       if (files.length === 0) return
       setUploading(true)
       setProgress({ done: 0, total: files.length })
+      const exifr = (await import("exifr")).default
       for (let i = 0; i < files.length; i++) {
         const fd = new FormData()
         fd.append("photo", files[i])
         fd.append("project_id", projectId)
+        // Pull GPS from EXIF so uploaded photos are geotagged like camera captures.
+        try {
+          const meta = await exifr.parse(files[i], { gps: true })
+          if (meta?.latitude && meta?.longitude) {
+            fd.append("lat", String(meta.latitude))
+            fd.append("lng", String(meta.longitude))
+          }
+        } catch {
+          /* no EXIF */
+        }
         await fetch("/api/photos", { method: "POST", body: fd })
         setProgress({ done: i + 1, total: files.length })
       }
