@@ -1,5 +1,6 @@
 import { db } from "@/lib/db"
 import { ChecklistFeed } from "@/components/checklists/checklist-feed"
+import { NewChecklistButton } from "@/components/checklists/new-checklist-button"
 
 export default async function ChecklistsPage() {
   const checklists = await db.checklist.findMany({
@@ -12,7 +13,10 @@ export default async function ChecklistsPage() {
   })
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Checklists</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Checklists</h1>
+        <NewChecklistButton />
+      </div>
       <ChecklistFeed checklists={checklists} />
     </div>
   )
