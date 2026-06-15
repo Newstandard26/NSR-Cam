@@ -1,0 +1,495 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- Auth ---
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// --- Core ---
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(FIELD)
+  initials      String?
+  color         String?   @default("#3B82F6")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts               Account[]
+  sessions               Session[]
+  photos                 Photo[]
+  videos                 Video[]
+  comments               Comment[]
+  projectUsers           ProjectUser[]
+  checklistAssignees     ChecklistAssignee[]
+  checklistCompletions   ChecklistItemCompletion[]
+  showcases              Showcase[]
+  reviewRequests         ReviewRequest[]
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  FIELD
+}
+
+model Customer {
+  id        String    @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  notes     String?   @db.Text
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  projects  Project[]
+}
+
+model Project {
+  id           String        @id @default(cuid())
+  name         String
+  street1      String?
+  street2      String?
+  city         String?
+  state        String?
+  postalCode   String?
+  country      String?       @default("US")
+  lat          Float?
+  lng          Float?
+  status       ProjectStatus @default(ACTIVE)
+  notepad      String?       @db.Text
+  description  String?       @db.Text
+  coverPhotoId String?
+  customerId   String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  customer      Customer?      @relation(fields: [customerId], references: [id])
+  labels        ProjectLabel[]
+  users         ProjectUser[]
+  photos        Photo[]
+  videos        Video[]
+  documents     Document[]
+  checklists    Checklist[]
+  reports       Report[]
+  pages         Page[]
+  comments      Comment[]      @relation("ProjectComments")
+  invitations   Invitation[]
+  collaborators Collaborator[]
+  tasks         Task[]
+  showcases     Showcase[]
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model Label {
+  id       String         @id @default(cuid())
+  name     String         @unique
+  color    String         @default("#6B7280")
+  projects ProjectLabel[]
+}
+
+model ProjectLabel {
+  projectId String
+  labelId   String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  label     Label   @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, labelId])
+}
+
+model ProjectUser {
+  projectId String
+  userId    String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+}
+
+model Invitation {
+  id        String           @id @default(cuid())
+  projectId String
+  email     String
+  status    InvitationStatus @default(PENDING)
+  token     String           @unique @default(cuid())
+  expiresAt DateTime
+  createdAt DateTime         @default(now())
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+model Collaborator {
+  id        String   @id @default(cuid())
+  projectId String
+  email     String
+  name      String?
+  joinedAt  DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Tag {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  color     String     @default("#6B7280")
+  createdAt DateTime   @default(now())
+  photoTags PhotoTag[]
+}
+
+model Photo {
+  id          String     @id @default(cuid())
+  projectId   String
+  userId      String?
+  storageKey  String
+  uri         String
+  capturedAt  DateTime   @default(now())
+  description String?    @db.Text
+  lat         Float?
+  lng         Float?
+  createdAt   DateTime   @default(now())
+
+  project  Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user     User?      @relation(fields: [userId], references: [id])
+  tags     PhotoTag[]
+  comments Comment[]  @relation("PhotoComments")
+}
+
+model PhotoTag {
+  photoId String
+  tagId   String
+  photo   Photo  @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([photoId, tagId])
+}
+
+model Video {
+  id          String      @id @default(cuid())
+  projectId   String
+  userId      String?
+  storageKey  String
+  playbackUrl String?
+  status      VideoStatus @default(PROCESSING)
+  duration    Int?
+  capturedAt  DateTime    @default(now())
+  createdAt   DateTime    @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id])
+}
+
+enum VideoStatus {
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+model Document {
+  id         String   @id @default(cuid())
+  projectId  String
+  name       String
+  storageKey String
+  uri        String
+  mimeType   String?
+  sizeBytes  Int?
+  createdAt  DateTime @default(now())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  text      String   @db.Text
+  userId    String?
+  projectId String?
+  photoId   String?
+  createdAt DateTime @default(now())
+
+  user    User?    @relation(fields: [userId], references: [id])
+  project Project? @relation("ProjectComments", fields: [projectId], references: [id], onDelete: Cascade)
+  photo   Photo?   @relation("PhotoComments", fields: [photoId], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  projectId   String
+  title       String
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  dueDate     DateTime?
+  createdAt   DateTime  @default(now())
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// --- Checklists ---
+
+model ChecklistTemplate {
+  id          String                  @id @default(cuid())
+  name        String
+  description String?                 @db.Text
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  items       ChecklistTemplateItem[]
+  checklists  Checklist[]
+}
+
+model ChecklistTemplateItem {
+  id           String            @id @default(cuid())
+  templateId   String
+  label        String
+  description  String?           @db.Text
+  requirePhoto Boolean           @default(false)
+  order        Int               @default(0)
+  template     ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}
+
+model Checklist {
+  id         String    @id @default(cuid())
+  projectId  String
+  templateId String?
+  name       String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  project   Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  template  ChecklistTemplate? @relation(fields: [templateId], references: [id])
+  items     ChecklistItem[]
+  assignees ChecklistAssignee[]
+}
+
+model ChecklistItem {
+  id           String                    @id @default(cuid())
+  checklistId  String
+  label        String
+  description  String?                   @db.Text
+  requirePhoto Boolean                   @default(false)
+  order        Int                       @default(0)
+  checklist    Checklist                 @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  completions  ChecklistItemCompletion[]
+}
+
+model ChecklistItemCompletion {
+  id          String        @id @default(cuid())
+  itemId      String
+  userId      String?
+  completedAt DateTime      @default(now())
+  item        ChecklistItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user        User?         @relation(fields: [userId], references: [id])
+}
+
+model ChecklistAssignee {
+  checklistId String
+  userId      String
+  checklist   Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([checklistId, userId])
+}
+
+// --- Reports ---
+
+model ReportTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  reports     Report[]
+}
+
+model Report {
+  id         String          @id @default(cuid())
+  projectId  String
+  templateId String?
+  name       String
+  pdfKey     String?
+  pdfUri     String?
+  createdAt  DateTime        @default(now())
+
+  project    Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  template   ReportTemplate?  @relation(fields: [templateId], references: [id])
+  photoItems ReportPhotoItem[]
+}
+
+model ReportPhotoItem {
+  id       String  @id @default(cuid())
+  reportId String
+  photoId  String
+  section  String?
+  order    Int     @default(0)
+  report   Report  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+}
+
+// --- Pages ---
+
+model PageTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  content   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Page {
+  id        String   @id @default(cuid())
+  projectId String
+  title     String   @default("Untitled")
+  content   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// --- Reviews ---
+
+model ReviewRequest {
+  id             String              @id @default(cuid())
+  userId         String?
+  customerId     String?
+  projectId      String?
+  channel        ReviewChannel
+  recipientName  String?
+  recipientEmail String?
+  recipientPhone String?
+  reviewLink     String?
+  status         ReviewRequestStatus @default(SENT)
+  sentAt         DateTime            @default(now())
+  user           User?               @relation(fields: [userId], references: [id])
+}
+
+enum ReviewChannel {
+  SMS
+  EMAIL
+}
+
+enum ReviewRequestStatus {
+  SENT
+  OPENED
+  CLICKED
+  REVIEWED
+}
+
+// --- Boards ---
+
+model Board {
+  id        String        @id @default(cuid())
+  name      String
+  createdAt DateTime      @default(now())
+  columns   BoardColumn[]
+}
+
+model BoardColumn {
+  id        String  @id @default(cuid())
+  boardId   String
+  name      String
+  color     String  @default("#6B7280")
+  labelName String?
+  order     Int     @default(0)
+  board     Board   @relation(fields: [boardId], references: [id], onDelete: Cascade)
+}
+
+// --- Portfolio / Showcases ---
+
+model Showcase {
+  id            String   @id @default(cuid())
+  projectId     String
+  userId        String?
+  title         String
+  serviceType   String?
+  description   String?  @db.Text
+  coverPhotoId  String?
+  beforePhotoId String?
+  afterPhotoId  String?
+  photoIds      String[]
+  approxLat     Float?
+  approxLng     Float?
+  rating        Int?
+  published     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id])
+}
+
+// --- Webhooks ---
+
+model Webhook {
+  id        String    @id @default(cuid())
+  url       String
+  secret    String
+  events    String[]
+  active    Boolean   @default(true)
+  lastFired DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  eventType   String
+  projectId   String?
+  payload     Json
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+  error       String?   @db.Text
+}
+
+// --- Automation ---
+
+model AutomationRule {
+  id         String   @id @default(cuid())
+  name       String
+  trigger    String
+  conditions Json     @default("[]")
+  actions    Json     @default("[]")
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}

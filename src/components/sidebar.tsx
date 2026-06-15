@@ -1,0 +1,152 @@
+"use client"
+
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import {
+  FolderOpen,
+  Camera,
+  Users,
+  ClipboardList,
+  FileText,
+  Map,
+  UserCircle,
+  Star,
+  Image,
+  LayoutGrid,
+  Tag,
+  Layers,
+  Settings,
+  ChevronDown,
+  ChevronRight,
+  Zap,
+  BarChart2,
+} from "lucide-react"
+import { useState } from "react"
+import { cn } from "@/lib/utils"
+
+const nav = [
+  {
+    label: "Projects",
+    icon: FolderOpen,
+    items: [
+      { label: "All Projects", href: "/projects" },
+      { label: "Boards", href: "/projects/boards" },
+    ],
+  },
+  { label: "Photos", href: "/photos", icon: Camera },
+  { label: "Customers", href: "/customers", icon: UserCircle },
+  { label: "Checklists", href: "/checklists", icon: ClipboardList },
+  { label: "Reports", href: "/reports", icon: FileText },
+  { label: "Map", href: "/map", icon: Map },
+  { label: "Team", href: "/team", icon: Users },
+  {
+    label: "Marketing",
+    icon: Star,
+    items: [
+      { label: "Reviews", href: "/reviews" },
+      { label: "Portfolio", href: "/portfolio" },
+    ],
+  },
+  {
+    label: "Resources",
+    icon: Layers,
+    items: [
+      { label: "Templates", href: "/templates" },
+      { label: "Tags", href: "/tags" },
+      { label: "Labels", href: "/labels" },
+      { label: "Automations", href: "/automations" },
+      { label: "Webhooks", href: "/settings/webhooks" },
+    ],
+  },
+  { label: "Analytics", href: "/analytics", icon: BarChart2 },
+]
+
+export function Sidebar() {
+  const pathname = usePathname()
+  const [open, setOpen] = useState<string[]>(["Projects", "Marketing", "Resources"])
+
+  function toggle(label: string) {
+    setOpen((prev) =>
+      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
+    )
+  }
+
+  return (
+    <aside className="w-56 shrink-0 bg-gray-900 text-gray-100 flex flex-col h-screen sticky top-0">
+      <div className="px-4 py-5 border-b border-gray-700">
+        <span className="text-lg font-bold tracking-tight text-white">NSR Cam</span>
+        <p className="text-xs text-gray-400 mt-0.5">New Standard Restoration</p>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto py-3 space-y-0.5 px-2">
+        {nav.map((item) => {
+          if ("items" in item) {
+            const isOpen = open.includes(item.label)
+            const Icon = item.icon
+            return (
+              <div key={item.label}>
+                <button
+                  onClick={() => toggle(item.label)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {isOpen ? (
+                    <ChevronDown className="w-3 h-3" />
+                  ) : (
+                    <ChevronRight className="w-3 h-3" />
+                  )}
+                </button>
+                {isOpen && (
+                  <div className="ml-6 mt-0.5 space-y-0.5">
+                    {(item.items ?? []).map((sub) => (
+                      <Link
+                        key={sub.href}
+                        href={sub.href}
+                        className={cn(
+                          "block px-2 py-1.5 rounded-md text-sm transition-colors",
+                          pathname === sub.href || pathname.startsWith(sub.href + "/")
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                        )}
+                      >
+                        {sub.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          const Icon = item.icon
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
+                pathname === item.href || pathname.startsWith(item.href + "/")
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-300 hover:bg-gray-800 hover:text-white"
+              )}
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              {item.label}
+            </Link>
+          )
+        })}
+      </nav>
+
+      <div className="px-4 py-3 border-t border-gray-700">
+        <Link
+          href="/settings"
+          className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors"
+        >
+          <Settings className="w-4 h-4" />
+          Settings
+        </Link>
+      </div>
+    </aside>
+  )
+}
