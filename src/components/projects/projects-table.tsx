@@ -52,10 +52,8 @@ export function ProjectsTable({ projects }: { projects: ProjectRow[] }) {
           <ul className="divide-y divide-gray-100">
             {filtered.map((p) => (
               <li key={p.id}>
-                <Link
-                  href={`/projects/${p.id}`}
-                  className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 transition-colors"
-                >
+                <div className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 transition-colors">
+                  <Link href={`/projects/${p.id}`} className="flex items-center gap-4 flex-1 min-w-0">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-gray-900 truncate">{p.name}</span>
@@ -106,7 +104,16 @@ export function ProjectsTable({ projects }: { projects: ProjectRow[] }) {
                   <div className="text-xs text-gray-400 w-24 text-right shrink-0">
                     {formatRelativeTime(p.updatedAt)}
                   </div>
-                </Link>
+                  </Link>
+                  <Link
+                    href={`/camera?project=${p.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    title={`Take photo for ${p.name}`}
+                    className="shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700"
+                  >
+                    <Camera className="w-5 h-5" />
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>
