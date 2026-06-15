@@ -32,9 +32,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900">
       <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-sm">
-        <div className="flex flex-col items-center mb-8">
-          <BrandMark className="h-9 w-auto text-gray-900" />
-          <p className="text-sm text-gray-500 mt-2 tracking-widest">SNAPSHOT</p>
+        <div className="flex justify-center mb-8 text-gray-900">
+          <BrandMark size="lg" subtitle="Snapshot" />
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

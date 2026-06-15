@@ -1,31 +1,32 @@
-// NSR ★ ELITE wordmark, recreated as SVG. Uses currentColor so it adapts to
-// light/dark backgrounds. Replace /public/brand/* with the official raster
-// assets when wiring favicon / marketing.
-export function BrandMark({ className = "" }: { className?: string }) {
+// NSR ★ ELITE wordmark — military stencil style (Black Ops One via --font-stencil).
+// Uses currentColor for border + text so it adapts to light/dark backgrounds.
+
+type Size = "sm" | "md" | "lg"
+
+const SIZES: Record<Size, { box: string; text: string; star: string; sub: string; border: string }> = {
+  sm: { box: "px-3 py-1 rounded-lg", text: "text-base", star: "text-sm", sub: "text-[9px] tracking-[0.35em] mt-1", border: "border-2" },
+  md: { box: "px-5 py-2 rounded-xl", text: "text-2xl", star: "text-xl", sub: "text-xs tracking-[0.4em] mt-2", border: "border-[3px]" },
+  lg: { box: "px-6 py-2.5 rounded-2xl", text: "text-3xl", star: "text-2xl", sub: "text-sm tracking-[0.45em] mt-2.5", border: "border-[3px]" },
+}
+
+export function BrandMark({
+  className = "",
+  size = "md",
+  subtitle,
+}: {
+  className?: string
+  size?: Size
+  subtitle?: string
+}) {
+  const s = SIZES[size]
   return (
-    <svg viewBox="0 0 320 64" className={className} role="img" aria-label="NSR Elite">
-      <rect
-        x="3"
-        y="3"
-        width="314"
-        height="58"
-        rx="4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="5"
-      />
-      <text
-        x="160"
-        y="44"
-        textAnchor="middle"
-        fontFamily="Arial Narrow, Arial, sans-serif"
-        fontWeight="800"
-        fontSize="34"
-        letterSpacing="2"
-        fill="currentColor"
-      >
-        NSR ★ ELITE
-      </text>
-    </svg>
+    <div className={`inline-flex flex-col items-center text-current ${className}`} style={{ fontFamily: "var(--font-stencil)" }}>
+      <div className={`${s.box} ${s.border} border-current inline-flex items-center leading-none`}>
+        <span className={`${s.text} tracking-wider`}>NSR</span>
+        <span className={`${s.star} mx-2`}>★</span>
+        <span className={`${s.text} tracking-wider`}>ELITE</span>
+      </div>
+      {subtitle && <span className={`${s.sub} uppercase`}>{subtitle}</span>}
+    </div>
   )
 }

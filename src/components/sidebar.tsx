@@ -80,9 +80,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <aside className="w-56 shrink-0 bg-gray-900 text-gray-100 flex flex-col h-screen sticky top-0">
-      <div className="px-4 py-5 border-b border-gray-700">
-        <BrandMark className="h-7 w-auto text-white" />
-        <p className="text-xs text-gray-400 mt-1.5 tracking-wide">SNAPSHOT</p>
+      <div className="px-4 py-5 border-b border-gray-700 flex justify-center text-white">
+        <BrandMark size="sm" subtitle="Snapshot" />
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3 space-y-0.5 px-2">

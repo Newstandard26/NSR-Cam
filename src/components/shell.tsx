@@ -39,7 +39,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <button onClick={() => setOpen(true)} aria-label="Open menu">
             <Menu className="w-6 h-6" />
           </button>
-          <BrandMark className="h-5 w-auto text-white" />
+          <BrandMark size="sm" />
           <Link href="/camera" className="ml-auto bg-blue-600 rounded-full p-2" aria-label="Camera">
             <Camera className="w-5 h-5" />
           </Link>
