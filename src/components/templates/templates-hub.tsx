@@ -55,14 +55,14 @@ export function TemplatesHub({
               key={t}
               onClick={() => setTab(t)}
               className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-                tab === t ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
+                tab === t ? "border-brand text-brand" : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
             >
               {t}
             </button>
           ))}
         </div>
-        <button onClick={() => setEditing("new")} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1">
+        <button onClick={() => setEditing("new")} className="bg-brand text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-dark flex items-center gap-1">
           <Plus className="w-4 h-4" /> New Template
         </button>
       </div>
@@ -126,7 +126,7 @@ function TemplateTable({
           <span className="flex-1 font-medium text-gray-900">{r.name}</span>
           {r.meta && <span className="text-xs text-gray-400">{r.meta}</span>}
           <span className="text-xs text-gray-400 w-24 text-right">{formatRelativeTime(r.updatedAt)}</span>
-          <button onClick={() => onEdit(r.id)} className="text-gray-400 hover:text-blue-600"><Pencil className="w-4 h-4" /></button>
+          <button onClick={() => onEdit(r.id)} className="text-gray-400 hover:text-brand"><Pencil className="w-4 h-4" /></button>
           <button onClick={() => onDelete(r.id)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
         </div>
       ))}
@@ -167,20 +167,20 @@ function ChecklistTemplateEditor({ record, onClose }: { record: CT | null; onClo
   return (
     <Modal title={record ? "Edit Checklist Template" : "New Checklist Template"} onClose={onClose}>
       <form onSubmit={save} className="space-y-3">
-        <input required placeholder="Template name" value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <textarea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <input required placeholder="Template name" value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-light" />
+        <textarea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-light" />
         <div className="space-y-2">
           <label className="text-xs font-semibold uppercase text-gray-400">Items</label>
           {items.map((item, idx) => (
             <div key={idx} className="flex items-center gap-2">
               <GripVertical className="w-4 h-4 text-gray-300 shrink-0" />
-              <input value={item} onChange={(e) => setItems(items.map((it, i) => (i === idx ? e.target.value : it)))} placeholder={`Item ${idx + 1}`} className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input value={item} onChange={(e) => setItems(items.map((it, i) => (i === idx ? e.target.value : it)))} placeholder={`Item ${idx + 1}`} className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-light" />
               <button type="button" onClick={() => setItems(items.filter((_, i) => i !== idx))} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4" /></button>
             </div>
           ))}
-          <button type="button" onClick={() => setItems([...items, ""])} className="text-sm text-blue-600 hover:underline flex items-center gap-1"><Plus className="w-3 h-3" /> Add Item</button>
+          <button type="button" onClick={() => setItems([...items, ""])} className="text-sm text-brand hover:underline flex items-center gap-1"><Plus className="w-3 h-3" /> Add Item</button>
         </div>
-        <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{saving ? "Saving..." : "Save Template"}</button>
+        <button type="submit" disabled={saving} className="w-full bg-brand text-white py-2 rounded-lg text-sm font-medium hover:bg-brand-dark disabled:opacity-50">{saving ? "Saving..." : "Save Template"}</button>
       </form>
     </Modal>
   )
@@ -203,9 +203,9 @@ function ReportTemplateEditor({ record, onClose }: { record: RT | null; onClose:
   return (
     <Modal title={record ? "Edit Report Template" : "New Report Template"} onClose={onClose}>
       <form onSubmit={save} className="space-y-3">
-        <input required placeholder="Template name" value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <textarea placeholder="Description / layout notes" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{saving ? "Saving..." : "Save Template"}</button>
+        <input required placeholder="Template name" value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-light" />
+        <textarea placeholder="Description / layout notes" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-light" />
+        <button type="submit" disabled={saving} className="w-full bg-brand text-white py-2 rounded-lg text-sm font-medium hover:bg-brand-dark disabled:opacity-50">{saving ? "Saving..." : "Save Template"}</button>
       </form>
     </Modal>
   )
@@ -228,9 +228,9 @@ function PageTemplateEditor({ record, onClose }: { record: PT | null; onClose: (
   return (
     <Modal title={record ? "Edit Page Template" : "New Page Template"} onClose={onClose}>
       <form onSubmit={save} className="space-y-3">
-        <input required placeholder="Template name" value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <textarea placeholder="Page content / boilerplate" value={content} onChange={(e) => setContent(e.target.value)} rows={8} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{saving ? "Saving..." : "Save Template"}</button>
+        <input required placeholder="Template name" value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-light" />
+        <textarea placeholder="Page content / boilerplate" value={content} onChange={(e) => setContent(e.target.value)} rows={8} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-light" />
+        <button type="submit" disabled={saving} className="w-full bg-brand text-white py-2 rounded-lg text-sm font-medium hover:bg-brand-dark disabled:opacity-50">{saving ? "Saving..." : "Save Template"}</button>
       </form>
     </Modal>
   )

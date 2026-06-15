@@ -25,9 +25,9 @@ export function LabelManager({ labels }: { labels: Label[] }) {
   return (
     <div className="max-w-2xl">
       <div className="flex gap-2 mb-4">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New label name" className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New label name" className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-light" />
         <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-10 h-10 rounded border border-gray-300" />
-        <button onClick={create} className="bg-blue-600 text-white px-4 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1"><Plus className="w-4 h-4" /> Add</button>
+        <button onClick={create} className="bg-brand text-white px-4 rounded-lg text-sm font-medium hover:bg-brand-dark flex items-center gap-1"><Plus className="w-4 h-4" /> Add</button>
       </div>
       <div className="rounded-xl border border-gray-200 bg-white divide-y divide-gray-100">
         {labels.length === 0 ? <div className="p-8 text-center text-sm text-gray-400">No labels yet.</div> : labels.map((l) => (

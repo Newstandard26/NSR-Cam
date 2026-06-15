@@ -21,7 +21,7 @@ export function ProjectMap({ projects }: { projects: Project[] }) {
         <div className="p-3 text-xs text-gray-500 border-b">{projects.length} located project(s)</div>
         {projects.map((p) => (
           <Link key={p.id} href={`/projects/${p.id}`} className="block px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
-            <div className="flex items-center gap-2"><MapPin className="w-4 h-4 text-blue-500" /><span className="font-medium text-gray-900 text-sm">{p.name}</span></div>
+            <div className="flex items-center gap-2"><MapPin className="w-4 h-4 text-brand" /><span className="font-medium text-gray-900 text-sm">{p.name}</span></div>
             <p className="text-xs text-gray-500 ml-6">{[p.street1, p.city, p.state].filter(Boolean).join(", ")}</p>
             <div className="ml-6 mt-1 flex gap-1">{p.labels.map((l) => <LabelBadge key={l.label.id} name={l.label.name} color={l.label.color} />)}</div>
           </Link>

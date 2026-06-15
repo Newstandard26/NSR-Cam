@@ -113,7 +113,7 @@ export function PhotoGrid({ photos }: { photos: PhotoItem[] }) {
                   href={`https://maps.google.com/?q=${photo.lat},${photo.lng}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                  className="inline-flex items-center gap-1 text-brand hover:underline"
                 >
                   <MapPin className="w-4 h-4" /> View location
                 </a>

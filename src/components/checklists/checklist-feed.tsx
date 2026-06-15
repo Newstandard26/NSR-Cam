@@ -44,10 +44,10 @@ export function ChecklistFeed({ checklists }: { checklists: Checklist[] }) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search..." className="flex-1 max-w-sm border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search..." className="flex-1 max-w-sm border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-light" />
         <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
           {(["all", "finished", "unfinished"] as const).map((f) => (
-            <button key={f} onClick={() => setFilter(f)} className={`px-3 py-2 capitalize ${filter === f ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>{f}</button>
+            <button key={f} onClick={() => setFilter(f)} className={`px-3 py-2 capitalize ${filter === f ? "bg-brand text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>{f}</button>
           ))}
         </div>
         <button onClick={exportCsv} className="ml-auto border border-gray-300 px-3 py-2 rounded-lg text-sm hover:bg-gray-50">Export CSV</button>
@@ -60,7 +60,7 @@ export function ChecklistFeed({ checklists }: { checklists: Checklist[] }) {
             <div key={c.id} className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50">
               <div className="flex-1">
                 <p className="font-medium text-gray-900">{c.name}</p>
-                <Link href={`/projects/${c.project.id}`} className="text-xs text-blue-600 hover:underline">{c.project.name}</Link>
+                <Link href={`/projects/${c.project.id}`} className="text-xs text-brand hover:underline">{c.project.name}</Link>
               </div>
               <div className="flex -space-x-2">{c.assignees.slice(0, 3).map((a) => <Avatar key={a.user.id} name={a.user.name || "?"} color={a.user.color} />)}</div>
               <div className="w-40">

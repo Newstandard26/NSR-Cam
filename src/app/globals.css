@@ -10,6 +10,11 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* NSR Elite brand blue */
+  --color-brand: #1c9fd9;
+  --color-brand-dark: #1683b5;
+  --color-brand-light: #4db8e8;
 }
 
 @media (prefers-color-scheme: dark) {

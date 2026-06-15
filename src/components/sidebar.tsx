@@ -113,7 +113,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                         className={cn(
                           "block px-2 py-1.5 rounded-md text-sm transition-colors",
                           pathname === sub.href || pathname.startsWith(sub.href + "/")
-                            ? "bg-blue-600 text-white"
+                            ? "bg-brand text-white"
                             : "text-gray-400 hover:bg-gray-800 hover:text-white"
                         )}
                       >
@@ -135,7 +135,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               className={cn(
                 "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
                 pathname === item.href || pathname.startsWith(item.href + "/")
-                  ? "bg-blue-600 text-white"
+                  ? "bg-brand text-white"
                   : "text-gray-300 hover:bg-gray-800 hover:text-white"
               )}
             >
@@ -152,7 +152,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           className={cn(
             "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
             pathname.startsWith("/settings")
-              ? "bg-blue-600 text-white"
+              ? "bg-brand text-white"
               : "text-gray-400 hover:bg-gray-800 hover:text-white"
           )}
         >

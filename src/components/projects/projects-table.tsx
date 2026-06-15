@@ -41,7 +41,7 @@ export function ProjectsTable({ projects }: { projects: ProjectRow[] }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search projects..."
-          className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-light"
         />
       </div>
 
@@ -109,7 +109,7 @@ export function ProjectsTable({ projects }: { projects: ProjectRow[] }) {
                     href={`/camera?project=${p.id}`}
                     onClick={(e) => e.stopPropagation()}
                     title={`Take photo for ${p.name}`}
-                    className="shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700"
+                    className="shrink-0 w-10 h-10 rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-dark"
                   >
                     <Camera className="w-5 h-5" />
                   </Link>

@@ -101,7 +101,7 @@ export function AccuLynxSettings({ initial, syncedProjects, lastEventAt }: Props
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder={hasApiKey ? "•••••••• (leave blank to keep)" : "Paste AccuLynx API key"}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-light"
           />
         </div>
 
@@ -114,7 +114,7 @@ export function AccuLynxSettings({ initial, syncedProjects, lastEventAt }: Props
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
             placeholder="https://api.acculynx.com/api/v2"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-light"
           />
         </div>
 
@@ -142,7 +142,7 @@ export function AccuLynxSettings({ initial, syncedProjects, lastEventAt }: Props
         <button
           onClick={save}
           disabled={saving}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
+          className="bg-brand text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-dark disabled:opacity-50 flex items-center gap-1"
         >
           <Check className="w-4 h-4" /> {saving ? "Saving..." : "Save"}
         </button>

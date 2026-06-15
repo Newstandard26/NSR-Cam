@@ -58,7 +58,7 @@ export function ReportsList({ reports }: { reports: Report[] }) {
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <button onClick={() => setOpen(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1">
+        <button onClick={() => setOpen(true)} className="bg-brand text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-dark flex items-center gap-1">
           <Plus className="w-4 h-4" /> New Report
         </button>
       </div>
@@ -72,11 +72,11 @@ export function ReportsList({ reports }: { reports: Report[] }) {
               <FileText className="w-5 h-5 text-gray-400" />
               <div className="flex-1">
                 <p className="font-medium text-gray-900">{r.name}</p>
-                <Link href={`/projects/${r.project.id}`} className="text-xs text-blue-600 hover:underline">{r.project.name}</Link>
+                <Link href={`/projects/${r.project.id}`} className="text-xs text-brand hover:underline">{r.project.name}</Link>
               </div>
               <span className="text-xs text-gray-400">{formatRelativeTime(r.createdAt)}</span>
               {r.pdfUri ? (
-                <a href={r.pdfUri} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                <a href={r.pdfUri} target="_blank" rel="noreferrer" className="text-sm text-brand hover:underline flex items-center gap-1">
                   <Download className="w-4 h-4" /> PDF
                 </a>
               ) : (
@@ -98,13 +98,13 @@ export function ReportsList({ reports }: { reports: Report[] }) {
               <button onClick={() => setOpen(false)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <form onSubmit={create} className="space-y-3">
-              <select required value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <select required value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-light">
                 <option value="">Select project…</option>
                 {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
-              <input placeholder="Report title (optional)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input placeholder="Report title (optional)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-light" />
               <p className="text-xs text-gray-500">All current photos on the project will be included. Generate the PDF after creating.</p>
-              <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+              <button type="submit" disabled={saving} className="w-full bg-brand text-white py-2 rounded-lg text-sm font-medium hover:bg-brand-dark disabled:opacity-50">
                 {saving ? "Creating..." : "Create Report"}
               </button>
             </form>

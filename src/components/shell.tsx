@@ -40,7 +40,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Menu className="w-6 h-6" />
           </button>
           <BrandMark size="sm" />
-          <Link href="/camera" className="ml-auto bg-blue-600 rounded-full p-2" aria-label="Camera">
+          <Link href="/camera" className="ml-auto bg-brand rounded-full p-2" aria-label="Camera">
             <Camera className="w-5 h-5" />
           </Link>
         </header>
