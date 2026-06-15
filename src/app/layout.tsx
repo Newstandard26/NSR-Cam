@@ -9,6 +9,17 @@ const stencil = Black_Ops_One({ weight: "400", subsets: ["latin"], variable: "--
 export const metadata: Metadata = {
   title: "NSR Elite — Snapshot",
   description: "Field photo documentation and project management for New Standard Restoration",
+  manifest: "/manifest.json",
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "NSR Snapshot" },
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+}
+
+export const viewport = {
+  themeColor: "#0f172a",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

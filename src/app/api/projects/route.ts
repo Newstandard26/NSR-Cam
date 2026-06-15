@@ -11,6 +11,7 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get("status") as "ACTIVE" | "ARCHIVED" | null
   const query = searchParams.get("query")
   const labelId = searchParams.get("label_id")
+  const filter = searchParams.get("filter") // mine | starred
 
   const projects = await db.project.findMany({
     where: {
@@ -22,6 +23,8 @@ export async function GET(req: NextRequest) {
         ],
       }),
       ...(labelId && { labels: { some: { labelId } } }),
+      ...(filter === "mine" && { users: { some: { userId: session.user.id } } }),
+      ...(filter === "starred" && { starred: true }),
     },
     include: {
       labels: { include: { label: true } },

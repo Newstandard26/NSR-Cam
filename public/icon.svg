@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0f172a"/>
+  <rect x="86" y="150" width="340" height="150" rx="18" fill="none" stroke="#fff" stroke-width="14"/>
+  <text x="256" y="252" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="78" fill="#fff">NSR</text>
+  <text x="256" y="360" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="46" letter-spacing="6" fill="#4db8e8">ELITE</text>
+</svg>

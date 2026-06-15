@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import {
   MousePointer2, Pencil, Minus, ArrowUpRight, Circle as CircleIcon, Square as SquareIcon,
-  Type, Clock, Sticker, RotateCw, Sliders, Trash2, Undo2, Redo2, X, Check, Crop,
+  Type, Clock, Sticker, RotateCw, Sliders, Trash2, Undo2, Redo2, X, Check, Crop, Ruler,
 } from "lucide-react"
 
 const COLORS = ["#ffffff", "#000000", "#06b6d4", "#22c55e", "#eab308", "#f97316", "#ec4899", "#ef4444"]
@@ -29,7 +29,7 @@ const STICKERS: StickerDef[] = [
   { id: "circle-x", kind: "emoji", text: "❌" },
 ]
 
-type Tool = "select" | "draw" | "line" | "arrow" | "circle" | "square" | "text" | "timestamp"
+type Tool = "select" | "draw" | "line" | "arrow" | "circle" | "square" | "text" | "timestamp" | "measure"
 
 export function AnnotationEditor({
   photoUrl,
@@ -76,6 +76,12 @@ export function AnnotationEditor({
   const [cropping, setCropping] = useState(false)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cropRectRef = useRef<any>(null)
+  const [showMeasureInput, setShowMeasureInput] = useState(false)
+  const [measureInput, setMeasureInput] = useState("")
+  const measureStartRef = useRef<{ x: number; y: number } | null>(null)
+  const pendingMeasureRef = useRef<{ start: { x: number; y: number }; end: { x: number; y: number } } | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tempDotRef = useRef<any>(null)
 
   toolRef.current = tool
   colorRef.current = color
@@ -127,6 +133,20 @@ export function AnnotationEditor({
         const t = toolRef.current
         if (t === "select" || t === "draw") return
         const p = canvas.getScenePoint(opt.e)
+        if (t === "measure") {
+          if (!measureStartRef.current) {
+            measureStartRef.current = { x: p.x, y: p.y }
+            const dot = new fabric.Circle({ left: p.x, top: p.y, radius: 6, fill: colorRef.current, originX: "center", originY: "center", selectable: false })
+            tempDotRef.current = dot
+            canvas.add(dot); canvas.renderAll()
+          } else {
+            pendingMeasureRef.current = { start: measureStartRef.current, end: { x: p.x, y: p.y } }
+            measureStartRef.current = null
+            if (tempDotRef.current) { canvas.remove(tempDotRef.current); tempDotRef.current = null }
+            setShowMeasureInput(true)
+          }
+          return
+        }
         startX = p.x; startY = p.y
         const stroke = colorRef.current
         const sw = thickRef.current
@@ -294,6 +314,26 @@ export function AnnotationEditor({
     c.loadFromJSON(JSON.parse(next)).then(() => { c.backgroundImage = img; c.renderAll() })
   }
 
+  function confirmMeasurement() {
+    const c = canvasRef.current, fabric = fabricRef.current, pend = pendingMeasureRef.current
+    if (!c || !fabric || !pend) return
+    const { start, end } = pend
+    const col = colorRef.current
+    const line = new fabric.Line([start.x, start.y, end.x, end.y], { stroke: col, strokeWidth: 3 })
+    const dotA = new fabric.Circle({ left: start.x, top: start.y, radius: 6, fill: col, originX: "center", originY: "center" })
+    const dotB = new fabric.Circle({ left: end.x, top: end.y, radius: 6, fill: col, originX: "center", originY: "center" })
+    const midX = (start.x + end.x) / 2, midY = (start.y + end.y) / 2
+    const text = new fabric.FabricText(measureInput || "—", { left: midX, top: midY - 24, fill: col, fontSize: 20, fontWeight: "bold", originX: "center", originY: "center", backgroundColor: "rgba(0,0,0,0.5)" })
+    const group = new fabric.Group([line, dotA, dotB, text])
+    c.add(group); c.setActiveObject(group); c.renderAll()
+    pendingMeasureRef.current = null
+    setShowMeasureInput(false); setMeasureInput(""); setTool("select"); pushHistory()
+  }
+  function cancelMeasurement() {
+    pendingMeasureRef.current = null
+    setShowMeasureInput(false); setMeasureInput("")
+  }
+
   async function save() {
     const c = canvasRef.current
     if (!c) return
@@ -328,6 +368,7 @@ export function AnnotationEditor({
         <Btn active={tool === "square"} title="Square (S)" onClick={() => setTool("square")}><SquareIcon className="w-5 h-5" /></Btn>
         <Btn active={tool === "text"} title="Text (T)" onClick={() => setTool("text")}><Type className="w-5 h-5" /></Btn>
         <Btn active={tool === "timestamp"} title="Timestamp" onClick={() => setTool("timestamp")}><Clock className="w-5 h-5" /></Btn>
+        <Btn active={tool === "measure"} title="Measure (tap two points)" onClick={() => setTool("measure")}><Ruler className="w-5 h-5" /></Btn>
         <Btn title="Color" onClick={() => { setShowColors((v) => !v); setShowThick(false); setShowStickers(false); setShowAdjust(false) }}>
           <span className="w-5 h-5 rounded-full border border-white" style={{ backgroundColor: color }} />
         </Btn>
@@ -356,6 +397,22 @@ export function AnnotationEditor({
             <span className="text-white text-xs">Drag the box, then apply</span>
             <button onClick={applyCrop} className="bg-brand text-white text-sm px-3 py-1 rounded-md hover:bg-brand-dark">Apply Crop</button>
             <button onClick={cancelCrop} className="text-gray-300 text-sm px-2">Cancel</button>
+          </div>
+        )}
+
+        {tool === "measure" && !showMeasureInput && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-3 py-2 rounded-lg z-20">
+            Tap two points to measure
+          </div>
+        )}
+        {showMeasureInput && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-xl p-4 z-30 w-72">
+            <p className="text-sm text-gray-500 mb-2">Enter measurement</p>
+            <div className="flex gap-2">
+              <input autoFocus value={measureInput} onChange={(e) => setMeasureInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && confirmMeasurement()} placeholder="5ft 7in" className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-brand-light" />
+              <button onClick={confirmMeasurement} className="bg-brand text-white px-4 rounded-lg text-sm font-medium">Done</button>
+            </div>
+            <button onClick={cancelMeasurement} className="text-gray-400 text-xs mt-2">Cancel</button>
           </div>
         )}
 

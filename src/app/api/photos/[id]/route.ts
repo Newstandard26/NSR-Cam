@@ -30,7 +30,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const body = await req.json()
   const data: Record<string, unknown> = {}
-  for (const k of ["description", "annotations", "brightness", "contrast", "saturation", "rotation"]) {
+  for (const k of ["description", "annotations", "brightness", "contrast", "saturation", "rotation", "hiddenFromTimeline", "projectId"]) {
     if (k in body) data[k] = body[k]
   }
   const photo = await db.photo.update({ where: { id }, data })
