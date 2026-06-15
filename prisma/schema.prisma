@@ -119,6 +119,7 @@ model Project {
   collaborators Collaborator[]
   tasks         Task[]
   showcases     Showcase[]
+  acculynxSync  AccuLynxSync?
 }
 
 enum ProjectStatus {
@@ -493,4 +494,40 @@ model AutomationRule {
   active     Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+// --- Integrations ---
+
+model IntegrationSettings {
+  id        String   @id @default(cuid())
+  provider  String   @unique // e.g. "acculynx"
+  enabled   Boolean  @default(false)
+  apiKey    String?  @db.Text
+  baseUrl   String?
+  config    Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AccuLynxSync {
+  id            String    @id @default(cuid())
+  acculynxJobId String    @unique
+  projectId     String    @unique
+  syncDirection String    @default("inbound") // inbound | outbound | bidirectional
+  status        String    @default("synced") // synced | error | pending
+  lastError     String?   @db.Text
+  lastSyncedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model AccuLynxEvent {
+  id          String    @id @default(cuid())
+  eventType   String
+  acculynxJobId String?
+  payload     Json
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+  error       String?   @db.Text
 }

@@ -51,6 +51,7 @@ const nav = [
     label: "Resources",
     icon: Layers,
     items: [
+      { label: "Integrations", href: "/settings/integrations" },
       { label: "Templates", href: "/templates" },
       { label: "Tags", href: "/tags" },
       { label: "Labels", href: "/labels" },
