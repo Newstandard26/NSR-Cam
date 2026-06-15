@@ -6,8 +6,8 @@ import { Providers } from "@/components/providers"
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" })
 
 export const metadata: Metadata = {
-  title: "NSR Cam | New Standard Restoration",
-  description: "Field documentation and project management for New Standard Restoration",
+  title: "NSR Elite — Snapshot",
+  description: "Field photo documentation and project management for New Standard Restoration",
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

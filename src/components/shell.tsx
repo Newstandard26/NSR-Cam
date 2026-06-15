@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { Menu, X, Camera } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
+import { BrandMark } from "@/components/brand"
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
@@ -38,7 +39,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <button onClick={() => setOpen(true)} aria-label="Open menu">
             <Menu className="w-6 h-6" />
           </button>
-          <span className="font-bold tracking-tight">NSR Cam</span>
+          <BrandMark className="h-5 w-auto text-white" />
           <Link href="/camera" className="ml-auto bg-blue-600 rounded-full p-2" aria-label="Camera">
             <Camera className="w-5 h-5" />
           </Link>

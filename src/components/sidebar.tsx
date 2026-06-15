@@ -26,6 +26,7 @@ import {
 import { useState } from "react"
 import { useSession, signOut } from "next-auth/react"
 import { cn, getUserInitials } from "@/lib/utils"
+import { BrandMark } from "@/components/brand"
 
 const nav = [
   {
@@ -80,8 +81,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <aside className="w-56 shrink-0 bg-gray-900 text-gray-100 flex flex-col h-screen sticky top-0">
       <div className="px-4 py-5 border-b border-gray-700">
-        <span className="text-lg font-bold tracking-tight text-white">NSR Cam</span>
-        <p className="text-xs text-gray-400 mt-0.5">New Standard Restoration</p>
+        <BrandMark className="h-7 w-auto text-white" />
+        <p className="text-xs text-gray-400 mt-1.5 tracking-wide">SNAPSHOT</p>
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3 space-y-0.5 px-2">

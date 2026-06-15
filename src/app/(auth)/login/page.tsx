@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { BrandMark } from "@/components/brand"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -31,9 +32,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900">
       <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-sm">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">NSR Cam</h1>
-          <p className="text-sm text-gray-500 mt-1">New Standard Restoration</p>
+        <div className="flex flex-col items-center mb-8">
+          <BrandMark className="h-9 w-auto text-gray-900" />
+          <p className="text-sm text-gray-500 mt-2 tracking-widest">SNAPSHOT</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
