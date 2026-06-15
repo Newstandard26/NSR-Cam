@@ -40,14 +40,16 @@ export async function POST(req: NextRequest) {
   const file = form.get("photo") as File
   const projectId = form.get("project_id") as string
   const description = form.get("description") as string | null
+  const latRaw = form.get("lat") as string | null
+  const lngRaw = form.get("lng") as string | null
 
   if (!file || !projectId) {
     return NextResponse.json({ error: "photo and project_id are required" }, { status: 400 })
   }
 
-  const key = `photos/${projectId}/${randomUUID()}-${file.name}`
+  const key = `photos/${projectId}/${randomUUID()}-${file.name || "capture.jpg"}`
   const buffer = Buffer.from(await file.arrayBuffer())
-  const { uri } = await uploadFile("nsr-cam", key, buffer, file.type)
+  const { uri } = await uploadFile("nsr-cam", key, buffer, file.type || "image/jpeg")
 
   const photo = await db.photo.create({
     data: {
@@ -56,6 +58,8 @@ export async function POST(req: NextRequest) {
       storageKey: key,
       uri,
       description,
+      lat: latRaw ? parseFloat(latRaw) : null,
+      lng: lngRaw ? parseFloat(lngRaw) : null,
       capturedAt: new Date(),
     },
   })

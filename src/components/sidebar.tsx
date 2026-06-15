@@ -36,7 +36,8 @@ const nav = [
       { label: "Boards", href: "/projects/boards" },
     ],
   },
-  { label: "Photos", href: "/photos", icon: Camera },
+  { label: "Camera", href: "/camera", icon: Camera },
+  { label: "Photos", href: "/photos", icon: Image },
   { label: "Customers", href: "/customers", icon: UserCircle },
   { label: "Checklists", href: "/checklists", icon: ClipboardList },
   { label: "Reports", href: "/reports", icon: FileText },
@@ -65,7 +66,7 @@ const nav = [
   { label: "Analytics", href: "/analytics", icon: BarChart2 },
 ]
 
-export function Sidebar() {
+export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
   const { data: session } = useSession()
   const [open, setOpen] = useState<string[]>(["Projects", "Marketing", "Resources"])
@@ -108,6 +109,7 @@ export function Sidebar() {
                       <Link
                         key={sub.href}
                         href={sub.href}
+                        onClick={onNavigate}
                         className={cn(
                           "block px-2 py-1.5 rounded-md text-sm transition-colors",
                           pathname === sub.href || pathname.startsWith(sub.href + "/")
@@ -129,6 +131,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
                 pathname === item.href || pathname.startsWith(item.href + "/")
