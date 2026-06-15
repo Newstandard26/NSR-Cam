@@ -44,8 +44,30 @@ export async function POST(req: NextRequest) {
 
   if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 })
 
+  // Best-effort geocode so the project shows on the map.
+  let lat: number | null = null
+  let lng: number | null = null
+  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+  const addr = [street1, city, state, postalCode].filter(Boolean).join(", ")
+  if (token && addr) {
+    try {
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(addr)}.json?limit=1&access_token=${token}`
+      const geo = await fetch(url)
+      if (geo.ok) {
+        const data = await geo.json()
+        const center = data.features?.[0]?.center
+        if (center) {
+          lng = center[0]
+          lat = center[1]
+        }
+      }
+    } catch {
+      // ignore geocode failures
+    }
+  }
+
   const project = await db.project.create({
-    data: { name, street1, city, state, postalCode, customerId },
+    data: { name, street1, city, state, postalCode, customerId, lat, lng },
   })
 
   return NextResponse.json(project, { status: 201 })
