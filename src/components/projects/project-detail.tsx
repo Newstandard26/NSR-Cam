@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { ChevronRight, Camera } from "lucide-react"
 import { Avatar, LabelBadge } from "@/components/ui/badges"
 import { PhotoGrid, type PhotoItem } from "@/components/photos/photo-grid"
@@ -44,8 +45,23 @@ export function ProjectDetail({ project }: { project: Project }) {
     .filter(Boolean)
     .join(", ")
 
+  const searchParams = useSearchParams()
+  const [showUploaded, setShowUploaded] = useState(false)
+  useEffect(() => {
+    if (searchParams.get("uploaded") === "true") {
+      setShowUploaded(true)
+      const t = setTimeout(() => setShowUploaded(false), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [searchParams])
+
   return (
     <div className="flex flex-col lg:flex-row">
+      {showUploaded && (
+        <div className="fixed top-0 inset-x-0 z-50 bg-gray-100 text-gray-700 text-sm text-center py-3 font-medium border-b border-gray-200">
+          All items have uploaded!
+        </div>
+      )}
       <div className="flex-1 p-6">
         <div className="flex items-center gap-1 text-sm text-gray-400 mb-2">
           <Link href="/projects" className="hover:text-gray-600">
