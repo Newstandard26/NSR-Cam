@@ -36,6 +36,7 @@ export function CameraCapture({
   const [pending, setPending] = useState<Pending | null>(null)
   const [description, setDescription] = useState("")
   const [toast, setToast] = useState<string | null>(null)
+  const [lastThumb, setLastThumb] = useState<string | null>(null)
 
   useEffect(() => {
     if (!lockedProjectId) {
@@ -103,7 +104,11 @@ export function CameraCapture({
     canvas.width = video.videoWidth; canvas.height = video.videoHeight
     canvas.getContext("2d")?.drawImage(video, 0, 0)
     canvas.toBlob((blob) => {
-      if (blob) setPending({ blob, dataUrl: canvas.toDataURL("image/jpeg", 0.5) })
+      if (blob) {
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.5)
+        setPending({ blob, dataUrl })
+        setLastThumb(dataUrl)
+      }
     }, "image/jpeg", 0.92)
   }
 
@@ -158,11 +163,24 @@ export function CameraCapture({
 
       {/* Viewfinder */}
       <div className="relative flex-1 overflow-hidden flex items-center justify-center">
-        <video ref={videoRef} playsInline muted className="w-full h-full object-cover transition-transform" />
+        <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover transition-transform" />
         <canvas ref={canvasRef} className="hidden" />
         {error && <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-gray-300 bg-black/70">{error}</div>}
         {coords && <div className="absolute top-2 right-3 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full">GPS on</div>}
         {toast && <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1 rounded-full">{toast}</div>}
+
+        {/* Last-captured thumbnail */}
+        {lastThumb && !pending && (
+          <div className="absolute bottom-3 left-4">
+            <div className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={lastThumb} alt="Last capture" className="w-14 h-14 rounded-xl object-cover border-2 border-white" />
+              {captured > 0 && (
+                <span className="absolute -top-1 -right-1 bg-brand text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">{captured}</span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Zoom */}
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2">
