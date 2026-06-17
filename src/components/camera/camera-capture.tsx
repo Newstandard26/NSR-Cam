@@ -52,6 +52,12 @@ export function CameraCapture({
   const [dualStep, setDualStep] = useState<"before" | "after">("before")
   const dualBeforeRef = useRef<{ blob: Blob; url: string } | null>(null)
 
+  // SCAN multipage
+  const [scannedPages, setScannedPages] = useState<string[]>([])
+  const [scanFlash, setScanFlash] = useState(false)
+  const [showNameModal, setShowNameModal] = useState(false)
+  const [docName, setDocName] = useState("Scanned Document")
+
   useEffect(() => {
     if (!lockedProjectId) {
       fetch("/api/projects").then((r) => r.json()).then((d) => {
@@ -104,6 +110,7 @@ export function CameraCapture({
   useEffect(() => {
     setDualStep("before")
     dualBeforeRef.current = null
+    setScannedPages([])
     if (mode !== "VIDEO" && mode !== "WALKTHRU" && isRecording) stopRecording()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
@@ -172,11 +179,12 @@ export function CameraCapture({
       const crop = document.createElement("canvas")
       crop.width = frameW; crop.height = frameH
       const cctx = crop.getContext("2d")!
-      cctx.filter = "contrast(1.15) brightness(1.05)"
+      cctx.filter = "contrast(1.2) brightness(1.05) saturate(0.85)"
       cctx.drawImage(canvas, fx, fy, frameW, frameH, 0, 0, frameW, frameH)
-      crop.toBlob((blob) => {
-        if (blob) { const url = crop.toDataURL("image/jpeg", 0.5); setPending({ blob, dataUrl: url }); setLastThumb(url) }
-      }, "image/jpeg", 0.95)
+      const pageUrl = crop.toDataURL("image/jpeg", 0.92)
+      setScannedPages((p) => [...p, pageUrl])
+      setLastThumb(pageUrl)
+      setScanFlash(true); setTimeout(() => setScanFlash(false), 180)
       return
     }
 
@@ -247,6 +255,34 @@ export function CameraCapture({
     return `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`
   }
 
+  async function saveScannedPdf() {
+    if (!projectId || scannedPages.length === 0) return
+    setShowNameModal(false)
+    setUploading(true)
+    try {
+      const { jsPDF } = await import("jspdf")
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
+      const w = pdf.internal.pageSize.getWidth(), h = pdf.internal.pageSize.getHeight()
+      scannedPages.forEach((page, i) => {
+        if (i > 0) pdf.addPage()
+        pdf.addImage(page, "JPEG", 0, 0, w, h, undefined, "FAST")
+      })
+      const pdfBlob = pdf.output("blob")
+      const fd = new FormData()
+      fd.append("file", pdfBlob, `${docName}.pdf`)
+      fd.append("project_id", projectId)
+      fd.append("name", docName)
+      const res = await fetch("/api/documents", { method: "POST", body: fd })
+      setUploading(false)
+      if (res.ok) {
+        streamRef.current?.getTracks().forEach((t) => t.stop())
+        router.push(`/projects/${projectId}?uploaded=true`)
+      } else setError("PDF upload failed.")
+    } catch {
+      setUploading(false); setError("Could not build PDF.")
+    }
+  }
+
   function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (file) { const r = new FileReader(); r.onload = () => setPending({ blob: file, dataUrl: r.result as string }); r.readAsDataURL(file) }
@@ -300,13 +336,27 @@ export function CameraCapture({
         {/* SCAN frame */}
         {mode === "SCAN" && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+            {scanFlash && <div className="absolute inset-0 bg-white z-50" />}
             <div className="relative" style={{ width: "75%", aspectRatio: "8.5/11", maxHeight: "85%", boxShadow: "0 0 0 2000px rgba(0,0,0,0.45)" }}>
               {["tl", "tr", "bl", "br"].map((c) => (
                 <div key={c} className={`absolute w-6 h-6 border-white border-2 ${c === "tl" ? "top-0 left-0 border-r-0 border-b-0" : c === "tr" ? "top-0 right-0 border-l-0 border-b-0" : c === "bl" ? "bottom-0 left-0 border-r-0 border-t-0" : "bottom-0 right-0 border-l-0 border-t-0"}`} />
               ))}
               <div className="absolute left-0 right-0 h-0.5 bg-brand-light/80" style={{ animation: "scan-line 2s linear infinite", top: "50%" }} />
             </div>
-            <p className="absolute bottom-24 text-white/80 text-xs px-8 text-center">Align document within frame and tap capture</p>
+            {scannedPages.length > 0 && (
+              <div className="absolute top-14 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-4 py-1.5 rounded-full">
+                {scannedPages.length} page{scannedPages.length !== 1 ? "s" : ""} scanned
+              </div>
+            )}
+            <p className="absolute bottom-24 text-white/80 text-xs px-8 text-center">Align each page in the frame and tap capture — then Save PDF</p>
+            {scannedPages.length > 0 && (
+              <div className="absolute bottom-24 right-3 flex flex-col gap-1">
+                {scannedPages.slice(-3).map((p, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={i} src={p} alt="" className="w-10 h-14 object-cover rounded border border-white/50" />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -328,7 +378,7 @@ export function CameraCapture({
         )}
 
         {/* Last-captured thumbnail */}
-        {lastThumb && !pending && mode !== "DUAL" && (
+        {lastThumb && !pending && mode !== "DUAL" && mode !== "SCAN" && (
           <div className="absolute bottom-3 left-4">
             <div className="relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -369,7 +419,11 @@ export function CameraCapture({
         ) : (
           <button onClick={streaming ? capture : startCamera} disabled={uploading || !projectId} className="rounded-full bg-white ring-4 ring-white/30 disabled:opacity-40" style={{ width: 72, height: 72 }} title="Capture" />
         )}
-        <div className="w-12 h-12" />
+        {mode === "SCAN" && scannedPages.length > 0 ? (
+          <button onClick={() => setShowNameModal(true)} className="w-12 h-12 rounded-full bg-brand text-white flex items-center justify-center text-xs font-semibold" title="Save PDF"><Check className="w-5 h-5" /></button>
+        ) : (
+          <div className="w-12 h-12" />
+        )}
       </div>
 
       {/* Mode tabs */}
@@ -378,6 +432,21 @@ export function CameraCapture({
           <button key={m} onClick={() => setMode(m)} className={`text-xs font-semibold tracking-wide whitespace-nowrap ${mode === m ? "text-brand-light" : "text-gray-400"}`}>{m}</button>
         ))}
       </div>
+
+      {/* Name PDF modal */}
+      {showNameModal && (
+        <div className="absolute inset-0 bg-black/80 z-[60] flex items-end" onClick={() => setShowNameModal(false)}>
+          <div className="w-full bg-white rounded-t-2xl p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-semibold text-lg mb-1 text-gray-900">Name this document</h3>
+            <p className="text-sm text-gray-500 mb-4">{scannedPages.length} page{scannedPages.length !== 1 ? "s" : ""} scanned</p>
+            <input autoFocus value={docName} onChange={(e) => setDocName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveScannedPdf()} placeholder="e.g. Insurance Estimate, Permit" className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base mb-4 focus:outline-none focus:ring-2 focus:ring-brand-light" />
+            <div className="flex gap-3">
+              <button onClick={() => setShowNameModal(false)} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-700">Cancel</button>
+              <button onClick={saveScannedPdf} disabled={uploading} className="flex-1 py-3 rounded-xl bg-brand text-white font-semibold disabled:opacity-50">{uploading ? "Saving…" : "Save PDF"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tag sheet */}
       {showTagSheet && (
