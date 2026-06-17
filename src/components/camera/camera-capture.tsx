@@ -48,15 +48,20 @@ export function CameraCapture({
   const [isRecording, setIsRecording] = useState(false)
   const [recSeconds, setRecSeconds] = useState(0)
 
-  // DUAL before/after
-  const [dualStep, setDualStep] = useState<"before" | "after">("before")
-  const dualBeforeRef = useRef<{ blob: Blob; url: string } | null>(null)
-
   // SCAN multipage
   const [scannedPages, setScannedPages] = useState<string[]>([])
   const [scanFlash, setScanFlash] = useState(false)
   const [showNameModal, setShowNameModal] = useState(false)
   const [docName, setDocName] = useState("Scanned Document")
+
+  // DUAL picture-in-picture video
+  const backVideoRef = useRef<HTMLVideoElement>(null)
+  const frontVideoRef = useRef<HTMLVideoElement>(null)
+  const dualCanvasRef = useRef<HTMLCanvasElement>(null)
+  const backStreamRef = useRef<MediaStream | null>(null)
+  const frontStreamRef = useRef<MediaStream | null>(null)
+  const rafRef = useRef<number | null>(null)
+  const [dualReady, setDualReady] = useState(false)
 
   useEffect(() => {
     if (!lockedProjectId) {
@@ -95,9 +100,60 @@ export function CameraCapture({
   }, [facing])
 
   useEffect(() => {
+    if (mode === "DUAL") return
     startCamera()
     return () => streamRef.current?.getTracks().forEach((t) => t.stop())
-  }, [startCamera])
+  }, [startCamera, mode])
+
+  // DUAL: run back + front cameras, composite to canvas
+  useEffect(() => {
+    if (mode !== "DUAL") return
+    let raf = 0
+    ;(async () => {
+      try {
+        streamRef.current?.getTracks().forEach((t) => t.stop())
+        const back = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: true })
+        backStreamRef.current = back
+        if (backVideoRef.current) { backVideoRef.current.srcObject = back; await backVideoRef.current.play().catch(() => {}) }
+        try {
+          const front = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+          frontStreamRef.current = front
+          if (frontVideoRef.current) { frontVideoRef.current.srcObject = front; await frontVideoRef.current.play().catch(() => {}) }
+        } catch { /* single-camera device */ }
+
+        const canvas = dualCanvasRef.current
+        if (!canvas) return
+        canvas.width = 1280; canvas.height = 720
+        const ctx = canvas.getContext("2d")!
+        const draw = () => {
+          if (backVideoRef.current && backVideoRef.current.readyState >= 2) ctx.drawImage(backVideoRef.current, 0, 0, canvas.width, canvas.height)
+          if (frontVideoRef.current && frontStreamRef.current && frontVideoRef.current.readyState >= 2) {
+            const size = 200, x = canvas.width - size - 20, y = canvas.height - size - 20
+            ctx.save()
+            ctx.beginPath(); ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2); ctx.clip()
+            ctx.drawImage(frontVideoRef.current, x, y, size, size)
+            ctx.restore()
+            ctx.strokeStyle = "#fff"; ctx.lineWidth = 3
+            ctx.beginPath(); ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2); ctx.stroke()
+          }
+          raf = requestAnimationFrame(draw)
+          rafRef.current = raf
+        }
+        draw()
+        setDualReady(true)
+      } catch {
+        setError("Dual camera unavailable on this device.")
+      }
+    })()
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      backStreamRef.current?.getTracks().forEach((t) => t.stop())
+      frontStreamRef.current?.getTracks().forEach((t) => t.stop())
+      backStreamRef.current = null; frontStreamRef.current = null
+      setDualReady(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode])
 
   useEffect(() => {
     const track = streamRef.current?.getVideoTracks()[0]
@@ -108,10 +164,8 @@ export function CameraCapture({
 
   // Reset transient mode state when switching modes
   useEffect(() => {
-    setDualStep("before")
-    dualBeforeRef.current = null
     setScannedPages([])
-    if (mode !== "VIDEO" && mode !== "WALKTHRU" && isRecording) stopRecording()
+    if (mode !== "VIDEO" && mode !== "WALKTHRU" && mode !== "DUAL" && isRecording) stopRecording()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
 
@@ -188,24 +242,6 @@ export function CameraCapture({
       return
     }
 
-    if (mode === "DUAL") {
-      const f = grabFrame()
-      const blob = await f.blob
-      if (!blob) return
-      if (dualStep === "before") {
-        dualBeforeRef.current = { blob, url: f.dataUrl }
-        setLastThumb(f.dataUrl); setDualStep("after")
-        showToast("Before captured — now take the After photo")
-      } else {
-        const before = dualBeforeRef.current
-        if (before) await uploadBlob(before.blob, "Before")
-        await uploadBlob(blob, "After")
-        setLastThumb(f.dataUrl); setDualStep("before"); dualBeforeRef.current = null
-        showToast("Before & After saved!")
-      }
-      return
-    }
-
     // PHOTO (default): show description card
     const f = grabFrame()
     const blob = await f.blob
@@ -220,7 +256,14 @@ export function CameraCapture({
 
   // ── Recording ──
   function startRecording() {
-    const stream = streamRef.current
+    let stream: MediaStream | null = streamRef.current
+    if (mode === "DUAL") {
+      const canvas = dualCanvasRef.current
+      if (!canvas || !backStreamRef.current) return
+      stream = canvas.captureStream(30)
+      const audio = backStreamRef.current.getAudioTracks()[0]
+      if (audio) stream.addTrack(audio)
+    }
     if (!stream) return
     chunksRef.current = []
     const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus") ? "video/webm;codecs=vp9,opus"
@@ -294,7 +337,7 @@ export function CameraCapture({
     router.push(lockedProjectId ? `/projects/${lockedProjectId}?uploaded=true` : "/projects?uploaded=true")
   }
 
-  const isVideoMode = mode === "VIDEO" || mode === "WALKTHRU"
+  const isVideoMode = mode === "VIDEO" || mode === "WALKTHRU" || mode === "DUAL"
 
   return (
     <div className="flex flex-col h-full bg-black">
@@ -321,7 +364,16 @@ export function CameraCapture({
 
       {/* Viewfinder */}
       <div className="relative flex-1 overflow-hidden flex items-center justify-center">
-        <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover transition-transform" />
+        {mode === "DUAL" ? (
+          <>
+            <video ref={backVideoRef} className="hidden" autoPlay playsInline muted />
+            <video ref={frontVideoRef} className="hidden" autoPlay playsInline muted />
+            <canvas ref={dualCanvasRef} className="w-full h-full object-cover" />
+            {!dualReady && <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">Starting dual camera…</div>}
+          </>
+        ) : (
+          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover transition-transform" />
+        )}
         <canvas ref={canvasRef} className="hidden" />
         {error && <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-black/80 z-30"><p className="text-white font-medium mb-1">Camera Unavailable</p><p className="text-gray-400 text-sm mb-4">{error}</p><button onClick={startCamera} className="bg-brand text-white px-5 py-2 rounded-full text-sm">Try Again</button></div>}
         {coords && <div className="absolute top-2 right-3 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full">GPS on</div>}
@@ -360,21 +412,9 @@ export function CameraCapture({
           </div>
         )}
 
-        {/* DUAL overlay */}
+        {/* DUAL label */}
         {mode === "DUAL" && (
-          <div className="absolute inset-0 pointer-events-none z-20">
-            <div className="absolute inset-y-0 left-1/2 w-0.5 bg-white/30" />
-            <div className="absolute top-1/2 -translate-y-1/2 left-4 text-white/60 text-xs font-semibold uppercase tracking-wider">Before</div>
-            <div className="absolute top-1/2 -translate-y-1/2 right-4 text-white/60 text-xs font-semibold uppercase tracking-wider">After</div>
-            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full">{dualStep === "before" ? "① Take BEFORE photo" : "② Take AFTER photo"}</div>
-          </div>
-        )}
-        {mode === "DUAL" && dualStep === "after" && dualBeforeRef.current && (
-          <div className="absolute bottom-3 left-4 z-30">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={dualBeforeRef.current.url} alt="Before" className="w-16 h-16 rounded-lg object-cover border-2 border-white opacity-80" />
-            <span className="absolute -top-2 -right-2 bg-gray-800 text-white text-[9px] px-1 rounded font-bold">BEFORE</span>
-          </div>
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 bg-black/50 text-white text-xs px-3 py-1 rounded-full pointer-events-none">DUAL VIDEO · you + the job site</div>
         )}
 
         {/* Last-captured thumbnail */}
