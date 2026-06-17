@@ -63,6 +63,14 @@ export function CameraCapture({
   const rafRef = useRef<number | null>(null)
   const [dualReady, setDualReady] = useState(false)
 
+  // WALKTHRU (audio + timestamped photos -> AI report)
+  const walkRecorderRef = useRef<MediaRecorder | null>(null)
+  const walkAudioStreamRef = useRef<MediaStream | null>(null)
+  const walkPhotosRef = useRef<{ blob: Blob; timestamp: number }[]>([])
+  const [walkPhotoCount, setWalkPhotoCount] = useState(0)
+  const [processing, setProcessing] = useState(false)
+  const [processStep, setProcessStep] = useState("")
+
   useEffect(() => {
     if (!lockedProjectId) {
       fetch("/api/projects").then((r) => r.json()).then((d) => {
@@ -242,6 +250,8 @@ export function CameraCapture({
       return
     }
 
+    if (mode === "WALKTHRU") { captureWalkthruPhoto(); return }
+
     // PHOTO (default): show description card
     const f = grabFrame()
     const blob = await f.blob
@@ -326,6 +336,82 @@ export function CameraCapture({
     }
   }
 
+  // ── WALKTHRU ──
+  async function startWalkthru() {
+    try {
+      const audio = await navigator.mediaDevices.getUserMedia({ audio: true })
+      walkAudioStreamRef.current = audio
+      walkPhotosRef.current = []
+      setWalkPhotoCount(0)
+      const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm"
+      const rec = new MediaRecorder(audio, { mimeType: mime })
+      walkRecorderRef.current = rec
+      const chunks: Blob[] = []
+      rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
+      rec.onstop = () => {
+        audio.getTracks().forEach((t) => t.stop())
+        processWalkthru(new Blob(chunks, { type: mime }))
+      }
+      rec.start(1000)
+      setIsRecording(true); setRecSeconds(0)
+      timerRef.current = setInterval(() => setRecSeconds((s) => s + 1), 1000)
+    } catch {
+      setError("Microphone permission required for Walkthrough.")
+    }
+  }
+  function stopWalkthru() {
+    walkRecorderRef.current?.stop()
+    setIsRecording(false)
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+  }
+  function captureWalkthruPhoto() {
+    if (!isRecording) { showToast("Press Record first"); return }
+    const f = grabFrame()
+    f.blob.then((blob) => {
+      if (!blob) return
+      walkPhotosRef.current.push({ blob, timestamp: recSeconds })
+      setWalkPhotoCount((c) => c + 1)
+      setLastThumb(f.dataUrl)
+      setScanFlash(true); setTimeout(() => setScanFlash(false), 150)
+    })
+  }
+  async function processWalkthru(audioBlob: Blob) {
+    if (!projectId) return
+    setProcessing(true)
+    try {
+      setProcessStep("Transcribing your walkthrough…")
+      const tf = new FormData()
+      tf.append("audio", audioBlob, "walkthru.webm")
+      const tr = await fetch("/api/walkthru/transcribe", { method: "POST", body: tf })
+      const { transcript } = tr.ok ? await tr.json() : { transcript: "" }
+
+      setProcessStep("Uploading photos…")
+      const photos: { url: string; timestamp: number }[] = []
+      for (const p of walkPhotosRef.current) {
+        const fd = new FormData()
+        fd.append("photo", p.blob, `walkthru-${p.timestamp}s.jpg`)
+        fd.append("project_id", projectId)
+        fd.append("description", `Walkthrough photo at ${fmt(p.timestamp)}`)
+        if (coords) { fd.append("lat", String(coords.lat)); fd.append("lng", String(coords.lng)) }
+        const r = await fetch("/api/photos", { method: "POST", body: fd })
+        if (r.ok) { const ph = await r.json(); photos.push({ url: ph.uri, timestamp: p.timestamp }) }
+      }
+
+      setProcessStep("Generating AI report…")
+      const sr = await fetch("/api/walkthru/summarize", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript, photos, projectId, durationSeconds: recSeconds }),
+      })
+      if (!sr.ok) throw new Error("summary failed")
+      const { reportId } = await sr.json()
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+      router.push(`/reports/${reportId}`)
+    } catch {
+      setProcessing(false); setProcessStep("")
+      setError("Report generation failed.")
+    }
+  }
+
   function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (file) { const r = new FileReader(); r.onload = () => setPending({ blob: file, dataUrl: r.result as string }); r.readAsDataURL(file) }
@@ -337,7 +423,7 @@ export function CameraCapture({
     router.push(lockedProjectId ? `/projects/${lockedProjectId}?uploaded=true` : "/projects?uploaded=true")
   }
 
-  const isVideoMode = mode === "VIDEO" || mode === "WALKTHRU" || mode === "DUAL"
+  const isVideoMode = mode === "VIDEO" || mode === "DUAL"
 
   return (
     <div className="flex flex-col h-full bg-black">
@@ -358,7 +444,13 @@ export function CameraCapture({
           </button>
           <button onClick={() => setFacing((f) => (f === "environment" ? "user" : "environment"))} className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center" title="Flip"><SwitchCamera className="w-5 h-5" /></button>
           <button onClick={toggleFlash} className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center" title="Flash">{flash ? <Zap className="w-5 h-5 text-yellow-400" /> : <ZapOff className="w-5 h-5" />}</button>
-          <button onClick={done} className="text-sm font-medium bg-white/10 px-3 h-9 rounded-full">Done{captured > 0 ? ` (${captured})` : ""}</button>
+          {mode === "WALKTHRU" ? (
+            <button onClick={isRecording ? stopWalkthru : startWalkthru} className={`text-sm font-semibold px-4 h-9 rounded-full ${isRecording ? "bg-red-500 text-white" : "bg-white text-gray-900"}`}>
+              {isRecording ? "Stop & Report" : "Record"}
+            </button>
+          ) : (
+            <button onClick={done} className="text-sm font-medium bg-white/10 px-3 h-9 rounded-full">Done{captured > 0 ? ` (${captured})` : ""}</button>
+          )}
         </div>
       </div>
 
@@ -415,6 +507,34 @@ export function CameraCapture({
         {/* DUAL label */}
         {mode === "DUAL" && (
           <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 bg-black/50 text-white text-xs px-3 py-1 rounded-full pointer-events-none">DUAL VIDEO · you + the job site</div>
+        )}
+
+        {/* WALKTHRU overlay */}
+        {mode === "WALKTHRU" && (
+          <div className="absolute inset-0 pointer-events-none z-20">
+            {scanFlash && <div className="absolute inset-0 bg-white" />}
+            {isRecording ? (
+              <>
+                <div className="absolute top-14 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/50 px-4 py-1.5 rounded-full">
+                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-white text-sm font-mono">{fmt(recSeconds)}</span>
+                  <span className="text-white/60 text-xs">🎙️ {walkPhotoCount} photo{walkPhotoCount !== 1 ? "s" : ""}</span>
+                </div>
+                {recSeconds < 6 && <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/60 text-white/80 text-xs px-4 py-2 rounded-full text-center">Walk and talk — tap the shutter to capture photos</div>}
+              </>
+            ) : (
+              <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/60 text-white/80 text-xs px-4 py-2 rounded-full text-center">Tap Record, then narrate as you walk the job</div>
+            )}
+          </div>
+        )}
+
+        {/* Processing overlay */}
+        {processing && (
+          <div className="absolute inset-0 bg-black/90 z-[70] flex flex-col items-center justify-center gap-4">
+            <Loader2 className="w-12 h-12 text-white animate-spin" />
+            <p className="text-white font-medium">{processStep}</p>
+            <p className="text-white/50 text-xs px-8 text-center">This takes 15–30 seconds depending on length</p>
+          </div>
         )}
 
         {/* Last-captured thumbnail */}

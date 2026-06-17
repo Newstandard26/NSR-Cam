@@ -380,6 +380,8 @@ model Report {
   projectId  String
   templateId String?
   name       String
+  kind       String          @default("standard") // standard | walkthru
+  content    Json?           // walkthru: { summary, sections, actionItems, rawTranscript, durationSeconds }
   pdfKey     String?
   pdfUri     String?
   createdAt  DateTime        @default(now())
