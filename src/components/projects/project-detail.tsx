@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { ChevronRight, Camera } from "lucide-react"
+import { ChevronRight, Camera, FileText, Download } from "lucide-react"
 import { Avatar, LabelBadge } from "@/components/ui/badges"
 import { PhotoGrid, type PhotoItem } from "@/components/photos/photo-grid"
 import { PhotoUploader } from "@/components/photos/photo-uploader"
@@ -27,10 +27,16 @@ type Project = {
 const TABS = ["Photos", "Pages", "Files", "Checklists", "Reports"] as const
 type Tab = (typeof TABS)[number]
 
+type Doc = { id: string; name: string; uri: string; sizeBytes: number | null; createdAt: string }
+type Vid = { id: string; playbackUrl: string | null; duration: number | null; capturedAt: string; user: { name: string | null } | null }
+
 export function ProjectDetail({ project }: { project: Project }) {
   const [tab, setTab] = useState<Tab>("Photos")
   const [photos, setPhotos] = useState<PhotoItem[]>([])
   const [loadingPhotos, setLoadingPhotos] = useState(true)
+  const [docs, setDocs] = useState<Doc[]>([])
+  const [videos, setVideos] = useState<Vid[]>([])
+  const [loadingFiles, setLoadingFiles] = useState(false)
 
   useEffect(() => {
     if (tab !== "Photos") return
@@ -39,6 +45,17 @@ export function ProjectDetail({ project }: { project: Project }) {
       .then((r) => r.json())
       .then((data) => setPhotos(Array.isArray(data) ? data : []))
       .finally(() => setLoadingPhotos(false))
+  }, [tab, project.id])
+
+  useEffect(() => {
+    if (tab !== "Files") return
+    setLoadingFiles(true)
+    Promise.all([
+      fetch(`/api/documents?project_id=${project.id}`).then((r) => r.json()),
+      fetch(`/api/videos?project_id=${project.id}`).then((r) => r.json()),
+    ])
+      .then(([d, v]) => { setDocs(Array.isArray(d) ? d : []); setVideos(Array.isArray(v) ? v : []) })
+      .finally(() => setLoadingFiles(false))
   }, [tab, project.id])
 
   const address = [project.street1, project.city, project.state, project.postalCode]
@@ -115,7 +132,56 @@ export function ProjectDetail({ project }: { project: Project }) {
             )}
           </div>
         )}
-        {tab !== "Photos" && (
+        {tab === "Files" && (
+          <div className="space-y-6">
+            {loadingFiles ? (
+              <p className="text-sm text-gray-400">Loading files…</p>
+            ) : docs.length === 0 && videos.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-gray-300 p-12 text-center text-sm text-gray-400">
+                No files yet. Use the camera&apos;s SCAN mode for PDFs, or VIDEO/DUAL for clips.
+              </div>
+            ) : (
+              <>
+                {videos.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase text-gray-400 mb-2">Videos ({videos.length})</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {videos.map((v) => (
+                        <div key={v.id} className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                          {v.playbackUrl ? (
+                            <video src={v.playbackUrl} controls playsInline className="w-full aspect-video bg-black" />
+                          ) : (
+                            <div className="aspect-video bg-gray-100 flex items-center justify-center text-xs text-gray-400">Processing…</div>
+                          )}
+                          <div className="px-3 py-2 text-xs text-gray-500 flex justify-between">
+                            <span>{v.user?.name ?? "Unknown"}</span>
+                            <span>{new Date(v.capturedAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {docs.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase text-gray-400 mb-2">Documents ({docs.length})</h3>
+                    <div className="rounded-xl border border-gray-200 bg-white divide-y divide-gray-100">
+                      {docs.map((d) => (
+                        <a key={d.id} href={d.uri} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
+                          <FileText className="w-5 h-5 text-red-500" />
+                          <span className="flex-1 text-sm text-gray-900">{d.name}.pdf</span>
+                          <span className="text-xs text-gray-400">{d.sizeBytes ? `${Math.round(d.sizeBytes / 1024)} KB` : ""}</span>
+                          <Download className="w-4 h-4 text-gray-400" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+        {tab !== "Photos" && tab !== "Files" && (
           <div className="rounded-lg border border-dashed border-gray-300 p-12 text-center text-sm text-gray-400">
             {tab} — coming soon
           </div>
