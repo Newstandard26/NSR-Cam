@@ -29,3 +29,9 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes scan-line {
+  0% { top: 6%; }
+  50% { top: 94%; }
+  100% { top: 6%; }
+}

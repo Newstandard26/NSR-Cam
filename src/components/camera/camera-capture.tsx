@@ -6,8 +6,8 @@ import { SwitchCamera, Zap, ZapOff, ImageIcon, Check, Loader2, X, Tag } from "lu
 
 type Project = { id: string; name: string }
 type Pending = { blob: Blob; dataUrl: string }
-
-const MODES = ["SCAN", "WALKTHRU", "PHOTO", "VIDEO", "DUAL"] as const
+type Mode = "SCAN" | "WALKTHRU" | "PHOTO" | "VIDEO" | "DUAL"
+const MODES: Mode[] = ["SCAN", "WALKTHRU", "PHOTO", "VIDEO", "DUAL"]
 
 export function CameraCapture({
   lockedProjectId,
@@ -27,7 +27,7 @@ export function CameraCapture({
   const [facing, setFacing] = useState<"environment" | "user">("environment")
   const [zoom, setZoom] = useState(1)
   const [flash, setFlash] = useState(false)
-  const [mode, setMode] = useState<(typeof MODES)[number]>("PHOTO")
+  const [mode, setMode] = useState<Mode>("PHOTO")
   const [streaming, setStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -39,7 +39,18 @@ export function CameraCapture({
   const [lastThumb, setLastThumb] = useState<string | null>(null)
   const [showTagSheet, setShowTagSheet] = useState(false)
   const [allTags, setAllTags] = useState<{ id: string; name: string; color: string }[]>([])
-  const [sessionTags, setSessionTags] = useState<string[]>([]) // tag ids applied to every capture
+  const [sessionTags, setSessionTags] = useState<string[]>([])
+
+  // Recording (VIDEO / WALKTHRU)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [isRecording, setIsRecording] = useState(false)
+  const [recSeconds, setRecSeconds] = useState(0)
+
+  // DUAL before/after
+  const [dualStep, setDualStep] = useState<"before" | "after">("before")
+  const dualBeforeRef = useRef<{ blob: Blob; url: string } | null>(null)
 
   useEffect(() => {
     if (!lockedProjectId) {
@@ -61,14 +72,18 @@ export function CameraCapture({
     try {
       streamRef.current?.getTracks().forEach((t) => t.stop())
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false,
+        video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: true,
       })
       streamRef.current = stream
-      if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play() }
+      if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play().catch(() => {}) }
       setStreaming(true)
-    } catch {
-      setError("Camera permission required. Use the upload button instead.")
+    } catch (e) {
+      const err = e as DOMException
+      if (err.name === "NotAllowedError") setError("Camera permission denied. Allow camera access in your browser settings.")
+      else if (err.name === "NotFoundError") setError("No camera found on this device.")
+      else if (err.name === "NotReadableError") setError("Camera is in use by another app.")
+      else setError("Camera unavailable. Use the upload button instead.")
       setStreaming(false)
     }
   }, [facing])
@@ -78,7 +93,6 @@ export function CameraCapture({
     return () => streamRef.current?.getTracks().forEach((t) => t.stop())
   }, [startCamera])
 
-  // Apply zoom: native track zoom if supported, CSS scale fallback.
   useEffect(() => {
     const track = streamRef.current?.getVideoTracks()[0]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,84 +100,165 @@ export function CameraCapture({
     if (videoRef.current) videoRef.current.style.transform = `scale(${zoom})`
   }, [zoom, streaming])
 
-  async function toggleFlash() {
-    const track = streamRef.current?.getVideoTracks()[0]
-    const next = !flash
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await track?.applyConstraints({ advanced: [{ torch: next } as any] })
-    } catch {}
-    setFlash(next)
-  }
+  // Reset transient mode state when switching modes
+  useEffect(() => {
+    setDualStep("before")
+    dualBeforeRef.current = null
+    if (mode !== "VIDEO" && mode !== "WALKTHRU" && isRecording) stopRecording()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode])
 
   function showToast(msg: string) {
     setToast(msg)
-    setTimeout(() => setToast(null), 1800)
+    setTimeout(() => setToast(null), 2200)
+  }
+
+  async function toggleFlash() {
+    const track = streamRef.current?.getVideoTracks()[0]
+    const next = !flash
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    try { await track?.applyConstraints({ advanced: [{ torch: next } as any] }) } catch {}
+    setFlash(next)
   }
 
   function openTagSheet() {
-    if (allTags.length === 0) {
-      fetch("/api/tags").then((r) => r.json()).then((d) => setAllTags(Array.isArray(d) ? d : []))
-    }
+    if (allTags.length === 0) fetch("/api/tags").then((r) => r.json()).then((d) => setAllTags(Array.isArray(d) ? d : []))
     setShowTagSheet(true)
   }
   function toggleSessionTag(id: string) {
     setSessionTags((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
   }
 
-  function capture() {
-    const video = videoRef.current, canvas = canvasRef.current
-    if (!video || !canvas) return
-    canvas.width = video.videoWidth; canvas.height = video.videoHeight
-    canvas.getContext("2d")?.drawImage(video, 0, 0)
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.5)
-        setPending({ blob, dataUrl })
-        setLastThumb(dataUrl)
-      }
-    }, "image/jpeg", 0.92)
-  }
-
-  async function confirmUpload() {
-    if (!pending || !projectId) { setError("Select a project first."); return }
+  async function uploadBlob(blob: Blob, desc: string) {
+    if (!projectId) { setError("Select a project first."); return }
     setUploading(true)
     const fd = new FormData()
-    fd.append("photo", pending.blob, `capture-${Date.now()}.jpg`)
+    fd.append("photo", blob, `capture-${Date.now()}.jpg`)
     fd.append("project_id", projectId)
-    if (description) fd.append("description", description)
+    if (desc) fd.append("description", desc)
     if (coords) { fd.append("lat", String(coords.lat)); fd.append("lng", String(coords.lng)) }
     const res = await fetch("/api/photos", { method: "POST", body: fd })
     if (res.ok) {
-      // Apply session tags to the new photo
       if (sessionTags.length) {
         const photo = await res.json()
-        await fetch(`/api/photos/${photo.id}/tags`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tagIds: sessionTags }),
-        }).catch(() => {})
+        await fetch(`/api/photos/${photo.id}/tags`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tagIds: sessionTags }) }).catch(() => {})
       }
-      setCaptured((c) => c + 1); setPending(null); setDescription("")
+      setCaptured((c) => c + 1)
     } else setError("Upload failed. Try again.")
     setUploading(false)
   }
 
+  function grabFrame(): { blob: Promise<Blob | null>; dataUrl: string } {
+    const video = videoRef.current!, canvas = canvasRef.current!
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight
+    canvas.getContext("2d")?.drawImage(video, 0, 0)
+    return {
+      dataUrl: canvas.toDataURL("image/jpeg", 0.5),
+      blob: new Promise((res) => canvas.toBlob((b) => res(b), "image/jpeg", 0.92)),
+    }
+  }
+
+  async function capture() {
+    const video = videoRef.current, canvas = canvasRef.current
+    if (!video || !canvas) return
+
+    if (mode === "SCAN") {
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight
+      const ctx = canvas.getContext("2d")!
+      ctx.drawImage(video, 0, 0)
+      const frameW = canvas.width * 0.75
+      const frameH = Math.min(frameW * (11 / 8.5), canvas.height * 0.9)
+      const fx = (canvas.width - frameW) / 2, fy = (canvas.height - frameH) / 2
+      const crop = document.createElement("canvas")
+      crop.width = frameW; crop.height = frameH
+      const cctx = crop.getContext("2d")!
+      cctx.filter = "contrast(1.15) brightness(1.05)"
+      cctx.drawImage(canvas, fx, fy, frameW, frameH, 0, 0, frameW, frameH)
+      crop.toBlob((blob) => {
+        if (blob) { const url = crop.toDataURL("image/jpeg", 0.5); setPending({ blob, dataUrl: url }); setLastThumb(url) }
+      }, "image/jpeg", 0.95)
+      return
+    }
+
+    if (mode === "DUAL") {
+      const f = grabFrame()
+      const blob = await f.blob
+      if (!blob) return
+      if (dualStep === "before") {
+        dualBeforeRef.current = { blob, url: f.dataUrl }
+        setLastThumb(f.dataUrl); setDualStep("after")
+        showToast("Before captured — now take the After photo")
+      } else {
+        const before = dualBeforeRef.current
+        if (before) await uploadBlob(before.blob, "Before")
+        await uploadBlob(blob, "After")
+        setLastThumb(f.dataUrl); setDualStep("before"); dualBeforeRef.current = null
+        showToast("Before & After saved!")
+      }
+      return
+    }
+
+    // PHOTO (default): show description card
+    const f = grabFrame()
+    const blob = await f.blob
+    if (blob) { setPending({ blob, dataUrl: f.dataUrl }); setLastThumb(f.dataUrl) }
+  }
+
+  async function confirmUpload() {
+    if (!pending) return
+    await uploadBlob(pending.blob, description)
+    setPending(null); setDescription("")
+  }
+
+  // ── Recording ──
+  function startRecording() {
+    const stream = streamRef.current
+    if (!stream) return
+    chunksRef.current = []
+    const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus") ? "video/webm;codecs=vp9,opus"
+      : MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "video/mp4"
+    const rec = new MediaRecorder(stream, { mimeType: mime })
+    recorderRef.current = rec
+    rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+    rec.onstop = async () => {
+      const blob = new Blob(chunksRef.current, { type: mime })
+      if (projectId) {
+        setUploading(true)
+        const fd = new FormData()
+        fd.append("video", blob, `${mode === "WALKTHRU" ? "walkthru" : "video"}-${Date.now()}.webm`)
+        fd.append("project_id", projectId)
+        fd.append("duration", String(recSeconds))
+        const res = await fetch("/api/videos", { method: "POST", body: fd })
+        setUploading(false)
+        if (res.ok) { setCaptured((c) => c + 1); showToast("Video saved") }
+        else setError("Video upload failed.")
+      }
+    }
+    rec.start(1000)
+    setIsRecording(true); setRecSeconds(0)
+    timerRef.current = setInterval(() => setRecSeconds((s) => s + 1), 1000)
+  }
+  function stopRecording() {
+    recorderRef.current?.stop()
+    setIsRecording(false)
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+  }
+  function fmt(s: number) {
+    return `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`
+  }
+
   function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = () => setPending({ blob: file, dataUrl: reader.result as string })
-      reader.readAsDataURL(file)
-    }
+    if (file) { const r = new FileReader(); r.onload = () => setPending({ blob: file, dataUrl: r.result as string }); r.readAsDataURL(file) }
     e.target.value = ""
   }
 
   function done() {
     streamRef.current?.getTracks().forEach((t) => t.stop())
-    if (lockedProjectId) router.push(`/projects/${lockedProjectId}?uploaded=true`)
-    else router.push("/projects")
+    router.push(lockedProjectId ? `/projects/${lockedProjectId}?uploaded=true` : "/projects?uploaded=true")
   }
+
+  const isVideoMode = mode === "VIDEO" || mode === "WALKTHRU"
 
   return (
     <div className="flex flex-col h-full bg-black">
@@ -172,7 +267,7 @@ export function CameraCapture({
         {lockedProjectId ? (
           <span className="text-sm truncate"><span className="text-gray-400">Saving to:</span> {lockedProjectName ?? "project"}</span>
         ) : (
-          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="bg-gray-800 text-white border border-gray-700 rounded-lg px-2 py-1 text-sm max-w-[55%]">
+          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="bg-gray-800 text-white border border-gray-700 rounded-lg px-2 py-1 text-sm max-w-[50%]">
             <option value="">Select project…</option>
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
@@ -192,19 +287,53 @@ export function CameraCapture({
       <div className="relative flex-1 overflow-hidden flex items-center justify-center">
         <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover transition-transform" />
         <canvas ref={canvasRef} className="hidden" />
-        {error && <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-gray-300 bg-black/70">{error}</div>}
+        {error && <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-black/80 z-30"><p className="text-white font-medium mb-1">Camera Unavailable</p><p className="text-gray-400 text-sm mb-4">{error}</p><button onClick={startCamera} className="bg-brand text-white px-5 py-2 rounded-full text-sm">Try Again</button></div>}
         {coords && <div className="absolute top-2 right-3 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full">GPS on</div>}
-        {toast && <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1 rounded-full">{toast}</div>}
+        {toast && <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-black/75 text-white text-sm font-medium px-4 py-2 rounded-full pointer-events-none">{toast}</div>}
+        {isRecording && (
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-white font-mono text-sm font-semibold">{fmt(recSeconds)}</span>
+          </div>
+        )}
+
+        {/* SCAN frame */}
+        {mode === "SCAN" && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+            <div className="relative" style={{ width: "75%", aspectRatio: "8.5/11", maxHeight: "85%", boxShadow: "0 0 0 2000px rgba(0,0,0,0.45)" }}>
+              {["tl", "tr", "bl", "br"].map((c) => (
+                <div key={c} className={`absolute w-6 h-6 border-white border-2 ${c === "tl" ? "top-0 left-0 border-r-0 border-b-0" : c === "tr" ? "top-0 right-0 border-l-0 border-b-0" : c === "bl" ? "bottom-0 left-0 border-r-0 border-t-0" : "bottom-0 right-0 border-l-0 border-t-0"}`} />
+              ))}
+              <div className="absolute left-0 right-0 h-0.5 bg-brand-light/80" style={{ animation: "scan-line 2s linear infinite", top: "50%" }} />
+            </div>
+            <p className="absolute bottom-24 text-white/80 text-xs px-8 text-center">Align document within frame and tap capture</p>
+          </div>
+        )}
+
+        {/* DUAL overlay */}
+        {mode === "DUAL" && (
+          <div className="absolute inset-0 pointer-events-none z-20">
+            <div className="absolute inset-y-0 left-1/2 w-0.5 bg-white/30" />
+            <div className="absolute top-1/2 -translate-y-1/2 left-4 text-white/60 text-xs font-semibold uppercase tracking-wider">Before</div>
+            <div className="absolute top-1/2 -translate-y-1/2 right-4 text-white/60 text-xs font-semibold uppercase tracking-wider">After</div>
+            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full">{dualStep === "before" ? "① Take BEFORE photo" : "② Take AFTER photo"}</div>
+          </div>
+        )}
+        {mode === "DUAL" && dualStep === "after" && dualBeforeRef.current && (
+          <div className="absolute bottom-3 left-4 z-30">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={dualBeforeRef.current.url} alt="Before" className="w-16 h-16 rounded-lg object-cover border-2 border-white opacity-80" />
+            <span className="absolute -top-2 -right-2 bg-gray-800 text-white text-[9px] px-1 rounded font-bold">BEFORE</span>
+          </div>
+        )}
 
         {/* Last-captured thumbnail */}
-        {lastThumb && !pending && (
+        {lastThumb && !pending && mode !== "DUAL" && (
           <div className="absolute bottom-3 left-4">
             <div className="relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={lastThumb} alt="Last capture" className="w-14 h-14 rounded-xl object-cover border-2 border-white" />
-              {captured > 0 && (
-                <span className="absolute -top-1 -right-1 bg-brand text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">{captured}</span>
-              )}
+              {captured > 0 && <span className="absolute -top-1 -right-1 bg-brand text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">{captured}</span>}
             </div>
           </div>
         )}
@@ -216,16 +345,14 @@ export function CameraCapture({
           ))}
         </div>
 
-        {/* Post-capture description prompt */}
+        {/* Post-capture description card */}
         {pending && (
-          <div className="absolute bottom-0 left-0 right-0 bg-white/95 p-3 flex items-center gap-3">
+          <div className="absolute bottom-0 left-0 right-0 bg-white/95 p-3 flex items-center gap-3 z-40">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={pending.dataUrl} alt="" className="w-14 h-14 rounded-lg object-cover" />
             <input autoFocus value={description} onChange={(e) => setDescription(e.target.value)} onKeyDown={(e) => e.key === "Enter" && confirmUpload()} placeholder="Add description…" className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-light" />
             <button onClick={() => { setPending(null); setDescription("") }} className="p-2 text-gray-400"><X className="w-5 h-5" /></button>
-            <button onClick={confirmUpload} disabled={uploading} className="bg-brand text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1">
-              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Done
-            </button>
+            <button onClick={confirmUpload} disabled={uploading} className="bg-brand text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1">{uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Done</button>
           </div>
         )}
       </div>
@@ -234,20 +361,21 @@ export function CameraCapture({
       <div className="bg-black px-4 py-4 flex items-center justify-between">
         <button onClick={() => fileInputRef.current?.click()} className="w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center"><ImageIcon className="w-5 h-5" /></button>
         <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={onFilePicked} className="hidden" />
-        <button onClick={streaming ? capture : startCamera} disabled={uploading || !projectId} className="rounded-full bg-white ring-4 ring-white/30 disabled:opacity-40" style={{ width: 72, height: 72 }} title="Capture" />
+        {isVideoMode ? (
+          <button onClick={isRecording ? stopRecording : startRecording} disabled={!projectId} className="relative flex items-center justify-center disabled:opacity-40" style={{ width: 72, height: 72 }}>
+            <div className={`absolute inset-0 rounded-full border-4 ${isRecording ? "border-red-500 animate-pulse" : "border-white"}`} />
+            {isRecording ? <div className="w-7 h-7 bg-red-500 rounded-sm" /> : <div className="w-14 h-14 bg-red-500 rounded-full" />}
+          </button>
+        ) : (
+          <button onClick={streaming ? capture : startCamera} disabled={uploading || !projectId} className="rounded-full bg-white ring-4 ring-white/30 disabled:opacity-40" style={{ width: 72, height: 72 }} title="Capture" />
+        )}
         <div className="w-12 h-12" />
       </div>
 
       {/* Mode tabs */}
       <div className="bg-black flex items-center justify-center gap-4 pb-6 overflow-x-auto">
         {MODES.map((m) => (
-          <button
-            key={m}
-            onClick={() => (m === "PHOTO" || m === "VIDEO" ? setMode(m) : showToast(`${m} — coming soon`))}
-            className={`text-xs font-semibold tracking-wide whitespace-nowrap ${mode === m ? "text-brand-light" : "text-gray-400"}`}
-          >
-            {m}
-          </button>
+          <button key={m} onClick={() => setMode(m)} className={`text-xs font-semibold tracking-wide whitespace-nowrap ${mode === m ? "text-brand-light" : "text-gray-400"}`}>{m}</button>
         ))}
       </div>
 
@@ -260,18 +388,17 @@ export function CameraCapture({
               <span className="font-semibold text-gray-900">Tag photos this session</span>
               <button onClick={() => setShowTagSheet(false)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
-            <p className="text-xs text-gray-500 mb-3">Selected tags are applied to every photo you take until you close the camera.</p>
+            <p className="text-xs text-gray-500 mb-3">Selected tags apply to every photo until you close the camera.</p>
             <div className="flex flex-wrap gap-2">
               {allTags.map((t) => {
                 const on = sessionTags.includes(t.id)
                 return (
                   <button key={t.id} onClick={() => toggleSessionTag(t.id)} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border ${on ? "border-brand bg-sky-50 text-brand" : "border-gray-300 text-gray-700"}`}>
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: t.color }} />
-                    {t.name}
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: t.color }} />{t.name}
                   </button>
                 )
               })}
-              {allTags.length === 0 && <p className="text-sm text-gray-400">No tags yet. Create them under Tags.</p>}
+              {allTags.length === 0 && <p className="text-sm text-gray-400">No tags yet.</p>}
             </div>
             <button onClick={() => setShowTagSheet(false)} className="mt-4 w-full bg-brand text-white py-2 rounded-lg text-sm font-medium hover:bg-brand-dark">Done</button>
           </div>
